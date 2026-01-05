@@ -1,0 +1,26 @@
+# Normalize text files to LF
+* text=auto eol=lf
+
+# # Python files: better diffing
+# *.py diff=python
+
+# # Jupyter notebooks: treat as binary (diffs are noise)
+# *.ipynb binary
+
+# # Images should be binary
+# *.png binary
+# *.jpg binary
+# *.jpeg binary
+# *.gif binary
+# *.svg binary
+
+# # Archives and binary outputs
+# *.zip binary
+# *.tar binary
+# *.gz binary
+# *.whl binary
+
+# # If using Git LFS (optional)
+# # *.pkl filter=lfs diff=lfs merge=lfs
+# # *.h5 filter=lfs diff=lfs merge=lfs
+# # *.pt filter=lfs diff=lfs merge=lfs

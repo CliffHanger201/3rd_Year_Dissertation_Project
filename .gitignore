@@ -1,0 +1,23 @@
+# ----- Python -----
+__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# ----- Java -----
+target/
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+
+# --- Maven / Gradle ---
+.mvn/
+.settings/
+.gradle/
+build/
+
+# --- IDEs ---
+.idea/
+.vscode/
