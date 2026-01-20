@@ -1,0 +1,5 @@
+setup.py
+src/python_hyper_heuristic.egg-info/PKG-INFO
+src/python_hyper_heuristic.egg-info/SOURCES.txt
+src/python_hyper_heuristic.egg-info/dependency_links.txt
+src/python_hyper_heuristic.egg-info/top_level.txt
