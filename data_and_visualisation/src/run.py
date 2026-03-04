@@ -1,7 +1,8 @@
 import json
 import time
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Type
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, DefaultDict
 
 from python_hyper_heuristic.src.hyperheuristic import HyperHeuristic
 
@@ -10,7 +11,6 @@ from python_hyper_heuristic.domains.Python.SAT.SAT import SAT
 from python_hyper_heuristic.domains.Python.VRP.VRP import VRP
 from python_hyper_heuristic.domains.Python.BinPacking.BinPacking import BinPacking
 from python_hyper_heuristic.domains.Python.TSP.TSP import TSP
-from python_hyper_heuristic.domains.Python.FlowShop.FlowShop import FlowShop
 
 
 @dataclass
@@ -145,13 +145,14 @@ def run_hyflex_domain(
 
 
 def run_hyflex_all_domains(
+    n_runs: int = 30,
     seed: int = 42,
     time_limit_ms: int = 5_000,
     instances: Optional[Dict[str, int]] = None,
     memory_size: int = 2,
     init_indices: Sequence[int] = (0, 1),
     out_json_path: str = "hh_all_domains_results.json",
-) -> Dict[str, DomainRunResult]:
+) -> Dict[str, List[DomainRunResult]]:
     """
     Run the same HyperHeuristic on SAT, VRP, BinPacking, TSP, FlowShop.
     `instances` lets you specify per-domain instance IDs, e.g. {"SAT": 0, "TSP": 3}
@@ -161,69 +162,43 @@ def run_hyflex_all_domains(
         ("VRP", VRP),
         ("BinPacking", BinPacking),
         ("TSP", TSP),
-        ("FlowShop", FlowShop),
     ]
 
     if instances is None:
         instances = {name: 0 for name, _cls in domain_specs}
 
-    results: Dict[str, DomainRunResult] = {}
+    all_results: DefaultDict[str, List[DomainRunResult]] = defaultdict(list)
 
-    for name, cls in domain_specs:
-        instance_id = instances.get(name, 0)
-        res = run_hyflex_domain(
-            domain_cls=cls,
-            domain_name=name,
-            seed=seed,
-            time_limit_ms=time_limit_ms,
-            instance_id=instance_id,
-            memory_size=memory_size,
-            init_indices=init_indices,
-        )
-        results[name] = res
+    for run_id in range(n_runs):
+        seed = seed + run_id
+        print(f"\n==============================")
+        print(f"RUN {run_id+1}/{n_runs} (seed={seed})")
+        print(f"==============================\n")
 
-        # ------------------------------
-        # Print per-domain summary
-        # ------------------------------
-        print(f"=== HyFlex {name} Run Summary ===")
-        print(f"Domain: {name}")
-        print(f"Seed: {seed}")
-        print(f"Instance ID: {instance_id}")
-        print(f"Time limit (ms): {time_limit_ms}")
-        print(f"Wall time (s): {res.wall_time_s:.3f}")
-        print()
-        print("Best objective:", res.best_value)
-        if res.best_solution_string is not None:
-            print("Best solution (string):")
-            print(res.best_solution_string)
-        else:
-            print("Best solution string: <unavailable>")
-        print()
-        print("Heuristic call counts:", res.heuristic_call_counts)
-        print("Heuristic total time (ms):", res.heuristic_call_times_ms)
-        if res.heuristic_call_counts:
-            print(f"Total heuristic calls: {sum(res.heuristic_call_counts)}")
-        if res.heuristic_call_times_ms:
-            print(f"Total heuristic time (ms): {sum(res.heuristic_call_times_ms)}")
+        for name, cls in domain_specs:
+            instance_id = instances.get(name, 0)
+            res = run_hyflex_domain(
+                domain_cls=cls,
+                domain_name=name,
+                seed=seed,
+                time_limit_ms=time_limit_ms,
+                instance_id=instance_id,
+                memory_size=memory_size,
+                init_indices=init_indices,
+            )
+            all_results[name].append(res)
 
-        if res.fitness_trace is not None:
-            try:
-                ft_len = len(res.fitness_trace)
-                print()
-                print(f"Fitness trace length: {ft_len}")
-                if ft_len > 0:
-                    print("Fitness trace (first 10):", list(res.fitness_trace)[:10])
-                    print("Fitness trace (last 10):", list(res.fitness_trace)[-10:])
-            except Exception:
-                pass
-
-        print("\n")
+            print(f"[{name}] seed={seed} inst={instance_id} best={res.best_value} wall={res.wall_time_s:.3f}s")
 
     # ------------------------------
     # Save combined results
     # ------------------------------
-    payload = {name: asdict(r) for name, r in results.items()}
+    payload = {
+        name: [asdict(r) for r in runs]
+        for name, runs in all_results.items()
+    }
     payload["_meta"] = {
+        "n_runs": n_runs,
         "seed": seed,
         "time_limit_ms": time_limit_ms,
         "memory_size": memory_size,
@@ -234,13 +209,14 @@ def run_hyflex_all_domains(
     with open(out_json_path, "w") as f:
         json.dump(payload, f, indent=2)
 
-    print(f"Saved results to: {out_json_path}")
-    return results
+    print(f"\nSaved results to: {out_json_path}")
+    return dict(all_results)
 
 
 if __name__ == "__main__":
     # Pick per-domain instance IDs as needed.
     run_hyflex_all_domains(
+        n_runs=30,
         seed=42,
         time_limit_ms=5_000,
         instances={
@@ -248,13 +224,94 @@ if __name__ == "__main__":
             "VRP": 0,
             "BinPacking": 0,
             "TSP": 0,
-            "FlowShop": 0,
         },
         memory_size=2,
         init_indices=(0, 1),
-        out_json_path="hh_all_domains_results.json",
+        out_json_path="results/python_hh_all_domains_results.json",
     )
 
+############################################
+#    Initial Single Hyperheuristic run
+############################################
+
+# def run_hyflex_all_domains(
+#     n_runs: int = 30,
+#     seed: int = 42,
+#     time_limit_ms: int = 5_000,
+#     instances: Optional[Dict[str, int]] = None,
+#     memory_size: int = 2,
+#     init_indices: Sequence[int] = (0, 1),
+#     out_json_path: str = "hh_all_domains_results.json",
+# ) -> Dict[str, DomainRunResult]:
+#     """
+#     Run the same HyperHeuristic on SAT, VRP, BinPacking, TSP, FlowShop.
+#     `instances` lets you specify per-domain instance IDs, e.g. {"SAT": 0, "TSP": 3}
+#     """
+#     domain_specs = [
+#         ("SAT", SAT),
+#         ("VRP", VRP),
+#         ("BinPacking", BinPacking),
+#         ("TSP", TSP),
+#     ]
+
+#     if instances is None:
+#         instances = {name: 0 for name, _cls in domain_specs}
+
+#     results: Dict[str, DomainRunResult] = {}
+
+#     for name, cls in domain_specs:
+#         instance_id = instances.get(name, 0)
+#         res = run_hyflex_domain(
+#             domain_cls=cls,
+#             domain_name=name,
+#             seed=seed,
+#             time_limit_ms=time_limit_ms,
+#             instance_id=instance_id,
+#             memory_size=memory_size,
+#             init_indices=init_indices,
+#         )
+#         results[name] = res
+
+#         # ------------------------------
+#         # Print per-domain summary
+#         # ------------------------------
+#         print(f"=== HyFlex {name} Run Summary ===")
+#         print(f"Domain: {name}")
+#         print(f"Seed: {seed}")
+#         print(f"Instance ID: {instance_id}")
+#         print(f"Time limit (ms): {time_limit_ms}")
+#         print(f"Wall time (s): {res.wall_time_s:.3f}")
+#         print()
+#         print("Best objective:", res.best_value)
+#         if res.best_solution_string is not None:
+#             print("Best solution (string):")
+#             print(res.best_solution_string)
+#         else:
+#             print("Best solution string: <unavailable>")
+#         print()
+#         print("Heuristic call counts:", res.heuristic_call_counts)
+#         print("Heuristic total time (ms):", res.heuristic_call_times_ms)
+#         if res.heuristic_call_counts:
+#             print(f"Total heuristic calls: {sum(res.heuristic_call_counts)}")
+#         if res.heuristic_call_times_ms:
+#             print(f"Total heuristic time (ms): {sum(res.heuristic_call_times_ms)}")
+
+#         if res.fitness_trace is not None:
+#             try:
+#                 ft_len = len(res.fitness_trace)
+#                 print()
+#                 print(f"Fitness trace length: {ft_len}")
+#                 if ft_len > 0:
+#                     print("Fitness trace (first 10):", list(res.fitness_trace)[:10])
+#                     print("Fitness trace (last 10):", list(res.fitness_trace)[-10:])
+#             except Exception:
+#                 pass
+
+#         print("\n")
+
+#######################################################################
+#   Single Hyperheuristic SAT run Code
+########################################################################
 
 # import json
 # import time

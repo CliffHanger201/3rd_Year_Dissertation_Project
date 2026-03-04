@@ -75,84 +75,61 @@ class VRP(ProblemDomain):
     def getNumberOfHeuristics(self) -> int:
         return 10
 
-    def applyHeuristic(self, heuristicID: int, solutionSourceIndex: int,
-                      solutionDestinationIndex: int) -> float:
+    def applyHeuristic(
+        self,
+        heuristicID: int,
+        solutionSourceIndex1: int,
+        solutionSourceIndex2: int = None,
+        solutionDestinationIndex: int = None
+    ) -> float:
+        """
+        HyFlex-style unified applyHeuristic:
+        - Unary:     applyHeuristic(h, src, dst)
+                    applyHeuristic(h, src, None, dst)
+        - Crossover: applyHeuristic(h, src1, src2, dst)
+        """
+
         start_ms = int(time.time() * 1000)
 
-        # detect crossover
-        isCrossover = False
-        crossovers = self.getHeuristicsOfType(HeuristicType.CROSSOVER)
-        for h in crossovers:
-            if h == heuristicID:
-                isCrossover = True
-                break
+        # ---- normalize arguments so we always end up with:
+        # unary:     src1, src2=None, dst
+        # crossover: src1, src2=int,  dst
+        if solutionDestinationIndex is None:
+            # Called like applyHeuristic(h, src, dst)
+            solutionDestinationIndex = solutionSourceIndex2
+            solutionSourceIndex2 = None
+
+        if solutionDestinationIndex is None:
+            raise TypeError("applyHeuristic requires a destination index")
 
         if self.solutions is None:
             raise RuntimeError("Memory not set. Call setMemorySize() first.")
 
-        if isCrossover:
-            self.solutions[solutionDestinationIndex] = self.solutions[solutionSourceIndex].copySolution()
-            return self.getFunctionValue(solutionDestinationIndex)
+        # detect crossover heuristic ID quickly
+        crossovers = set(self.getHeuristicsOfType(HeuristicType.CROSSOVER) or [])
+        is_crossover = heuristicID in crossovers
 
-        score = 0.0
-        if heuristicID == 0:
-            score = self.twoOpt(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 1:
-            score = self.orOpt(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 2:
-            score = self.locRR(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 3:
-            score = self.timeRR(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 4:
-            score = self.shift(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 7:
-            score = self.shiftMutate(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 8:
-            score = self.twoOptStar(solutionSourceIndex, solutionDestinationIndex)
-        elif heuristicID == 9:
-            score = self.GENI(solutionSourceIndex, solutionDestinationIndex)
-        else:
-            print(f"Heuristic {heuristicID} does not exist")
-            return 0.0
+        # ---- Crossover branch
+        if is_crossover:
+            if solutionSourceIndex2 is None:
+                # This is the key: if HH mistakenly calls crossover unary,
+                # don’t silently copy; raise so you catch the bug early.
+                raise TypeError(
+                    f"Heuristic {heuristicID} is CROSSOVER but was called without a second parent"
+                )
 
-        # records exist in ProblemDomain (assumed)
-        self.heuristicCallRecord[heuristicID] += 1
-        self.heuristicCallTimeRecord[heuristicID] += int(int(time.time() * 1000) - start_ms)
-        return score
-
-    def applyHeuristic4(self, heuristicID: int, solutionSourceIndex1: int,
-                        solutionSourceIndex2: int, solutionDestinationIndex: int) -> float:
-        """
-        Java overload: applyHeuristic(int heuristicID, int src1, int src2, int dest)
-        Named applyHeuristic4 to avoid clobbering the 3-arg version in Python.
-        """
-        start_ms = int(time.time() * 1000)
-
-        # detect crossover
-        isCrossover = False
-        crossovers = self.getHeuristicsOfType(HeuristicType.CROSSOVER)
-        for h in crossovers:
-            if h == heuristicID:
-                isCrossover = True
-                break
-
-        if self.solutions is None:
-            raise RuntimeError("Memory not set. Call setMemorySize() first.")
-
-        if isCrossover:
-            score = 0.0
             if heuristicID == 5:
                 score = self.combine(solutionSourceIndex1, solutionSourceIndex2, solutionDestinationIndex)
             elif heuristicID == 6:
                 score = self.combineLong(solutionSourceIndex1, solutionSourceIndex2, solutionDestinationIndex)
             else:
-                print(f"Heuristic {heuristicID} does not exist")
-                return 0.0
+                raise ValueError(f"Crossover heuristic {heuristicID} not implemented")
 
             self.heuristicCallRecord[heuristicID] += 1
             self.heuristicCallTimeRecord[heuristicID] += int(int(time.time() * 1000) - start_ms)
             return score
 
+        # ---- Unary branch
         score = 0.0
         if heuristicID == 0:
             score = self.twoOpt(solutionSourceIndex1, solutionDestinationIndex)
@@ -171,8 +148,7 @@ class VRP(ProblemDomain):
         elif heuristicID == 9:
             score = self.GENI(solutionSourceIndex1, solutionDestinationIndex)
         else:
-            print(f"Heuristic {heuristicID} does not exist")
-            return 0.0
+            raise ValueError(f"Heuristic {heuristicID} does not exist")
 
         self.heuristicCallRecord[heuristicID] += 1
         self.heuristicCallTimeRecord[heuristicID] += int(int(time.time() * 1000) - start_ms)

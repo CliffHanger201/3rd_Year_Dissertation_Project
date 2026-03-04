@@ -478,7 +478,7 @@ class BinPacking(ProblemDomain):
                     break
             if newbin:
                 child.append(b)
-                b.copypiecenumbers(numberspacked)
+                b.copyPieceNumbers(numberspacked)
                 binlist.pop(i)
             else:
                 i += 1
@@ -553,7 +553,7 @@ class BinPacking(ProblemDomain):
     def getNumberOfHeuristics(self) -> int:
         return 8
 
-    def applyHeuristic(self, heuristicID: int, source: int, destination: int) -> float:
+    def applyHeuristicUnary(self, heuristicID: int, source: int, destination: int) -> float:
         import time
         start = time.time()
 
@@ -604,7 +604,7 @@ class BinPacking(ProblemDomain):
 
         return newobj
 
-    def applyHeuristic2parents(self, heuristicID: int, source1: int, source2: int, destination: int) -> float:
+    def applyHeuristicCrossover(self, heuristicID: int, source1: int, source2: int, destination: int) -> float:
         import time
         start = time.time()
 
@@ -656,6 +656,49 @@ class BinPacking(ProblemDomain):
         self.solutionMemory[destination].solution = self.deepCopyBins(temp1)
 
         return newobj
+    
+    def applyHeuristic(
+        self,
+        heuristicID: int,
+        solutionSourceIndex1: int,
+        solutionSourceIndex2: int = None,
+        solutionDestinationIndex: int = None
+    ) -> float:
+        """
+        HyFlex-compatible unified applyHeuristic.
+
+        Supports:
+        - Unary:     applyHeuristic(h, src, dst)
+                    applyHeuristic(h, src, None, dst)
+        - Crossover: applyHeuristic(h, src1, src2, dst)
+        """
+
+        # Called as applyHeuristic(h, src, dst)
+        if solutionDestinationIndex is None:
+            solutionDestinationIndex = solutionSourceIndex2
+            solutionSourceIndex2 = None
+
+        if solutionDestinationIndex is None:
+            raise TypeError("applyHeuristic requires a destination index")
+
+        is_crossover = heuristicID in set(self.getHeuristicsOfType(HeuristicType.CROSSOVER) or [])
+
+        if is_crossover:
+            if solutionSourceIndex2 is None:
+                # This is the key: don’t silently copy for crossover.
+                # Force the HH (or caller) to provide parent2 correctly.
+                raise TypeError(
+                    f"Heuristic {heuristicID} is CROSSOVER but was called without a second parent"
+                )
+            return self.applyHeuristicCrossover(
+                heuristicID,
+                solutionSourceIndex1,
+                solutionSourceIndex2,
+                solutionDestinationIndex,
+            )
+
+        # Not crossover -> unary path
+        return self.applyHeuristicUnary(heuristicID, solutionSourceIndex1, solutionDestinationIndex)
 
     def copySolution(self, source: int, destination: int) -> None:
         if self.solutionMemory[source] is None:

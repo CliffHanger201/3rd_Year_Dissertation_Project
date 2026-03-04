@@ -35,7 +35,7 @@ class TSP(ProblemDomain):
         self.bestSoFar: Optional[TspSolution] = None
         self.algorithms: Optional[TspBasicAlgorithms] = None
 
-    def applyHeuristic(self, llhID: int, solutionSourceIndex: int, solutionDestinationIndex: int) -> float:
+    def applyHeuristicUnary(self, llhID: int, solutionSourceIndex: int, solutionDestinationIndex: int) -> float:
         startTime = int(time.time() * 1000)
 
         isCrossover = False
@@ -135,6 +135,43 @@ class TSP(ProblemDomain):
         assert self.algorithms.verify_permutation(dest.permutation, self.instance.numbCities)
 
         return dest.cost
+    
+    def applyHeuristic(
+        self,
+        llhID: int,
+        solutionSourceIndex1: int,
+        solutionSourceIndex2: int = None,
+        solutionDestinationIndex: int = None,
+    ) -> float:
+        """
+        HyFlex-compatible applyHeuristic.
+
+        Supports:
+        - Unary:     applyHeuristic(h, src, dst)
+                    applyHeuristic(h, src, None, dst)
+        - Crossover: applyHeuristic(h, src1, src2, dst)
+        """
+
+        # Called as applyHeuristic(h, src, dst)
+        if solutionDestinationIndex is None:
+            solutionDestinationIndex = solutionSourceIndex2
+            solutionSourceIndex2 = None
+
+        if solutionDestinationIndex is None:
+            raise TypeError("applyHeuristic requires a destination index")
+
+        crossovers = set(self.getHeuristicsOfType(HeuristicType.CROSSOVER) or [])
+        is_crossover = llhID in crossovers
+
+        if is_crossover:
+            if solutionSourceIndex2 is None:
+                # IMPORTANT: don't silently copy for crossover calls.
+                raise TypeError(
+                    f"Heuristic {llhID} is CROSSOVER but was called without a second parent"
+                )
+            return self.applyHeuristicCrossover(llhID, solutionSourceIndex1, solutionSourceIndex2, solutionDestinationIndex)
+
+        return self.applyHeuristicUnary(llhID, solutionSourceIndex1, solutionDestinationIndex)
 
     def bestSolutionToString(self) -> str:
         assert self.bestSoFar is not None

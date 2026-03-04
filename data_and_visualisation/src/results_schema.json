@@ -1,0 +1,12 @@
+{
+  "source": "java-hyflex" | "python-hh",
+  "hyperheuristic": "HHName",
+  "domain": "SAT|VRP|BinPacking|TSP|FlowShop",
+  "instance_id": 0,
+  "seed": 42,
+  "time_limit_ms": 5000,
+  "best_value": 123.0,
+  "fitness_trace": [ ... best-so-far values ... ],
+  "heuristic_call_counts": [ ... ],
+  "heuristic_call_times_ms": [ ... ]
+}
