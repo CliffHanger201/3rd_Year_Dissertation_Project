@@ -85,7 +85,7 @@ def run_hyflex_domain(
     domain_cls: Type,
     domain_name: str,
     seed: int = 42,
-    time_limit_ms: int = 5_000,
+    time_limit_ms: int = 30000,
     instance_id: int = 0,
     memory_size: int = 2,
     init_indices: Sequence[int] = (0, 1),
@@ -147,7 +147,7 @@ def run_hyflex_domain(
 def run_hyflex_all_domains(
     n_runs: int = 30,
     seed: int = 42,
-    time_limit_ms: int = 5_000,
+    time_limit_ms: int = 30000,
     instances: Optional[Dict[str, int]] = None,
     memory_size: int = 2,
     init_indices: Sequence[int] = (0, 1),
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     run_hyflex_all_domains(
         n_runs=30,
         seed=42,
-        time_limit_ms=5_000,
+        time_limit_ms=30000,
         instances={
             "SAT": 0,
             "VRP": 0,
