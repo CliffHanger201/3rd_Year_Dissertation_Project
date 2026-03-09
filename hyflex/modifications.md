@@ -15,9 +15,11 @@ The modifications were necessary to:
 
 | File | Description of Change | Reason / Impact |
 |------|---------------------|----------------|
-| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\EarleyParser.java` | Change all § into \u00A7 | Allows for Hyflex to built on Windows |
-| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\LLParser.java` | Change all § into \u00A7 | Allows for Hyflex to built on Windows |
-| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\Grammar.java` | Change all § into \u00A7 | Allows for Hyflex to built on Windows |
+| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\EarleyParser.java` | Change all § into \u00A7 | Allows for Hyflex to be built on Windows VSCode |
+| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\LLParser.java` | Change all § into \u00A7 | Allows for Hyflex to be built on Windows VSCode|
+| `hyflex\hyflex-ext\src\main\java\hfu\parsers\cfg\pep\Grammar.java` | Change all § into \u00A7 | Allows for Hyflex to be built on Windows VSCode|
+| `hyflex/build.gradle` | Modified repository from jcenter() to mavenCentral() | jcenter deprecated since 2022, mavenCentral for Gradle replacement |
+| `hyflex/hyflex/build.gradle` | Modified repository from jcenter() to mavenCentral() | jcenter deprecated since 2022, mavenCentral for Gradle replacement |
 | `hyflex/MODIFICATIONS.md` | Created this file | Document all changes for clarity and reproducibility |
 
 ---

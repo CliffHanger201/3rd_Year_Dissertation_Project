@@ -9,9 +9,13 @@ import VRP.VRP;
 import SAT.SAT;
 
 // CHeSC 2011 hyper-heuristics
-import be.kuleuven.kahosl.hyperheuristic.GIHH;
-import pearlHunter.PearlHunter;
-import csput.CSPUTGeneticHiveHyperHeuristic;
+import be.kuleuven.kahosl.hyperheuristic.GIHH; // AdapHH-GIHH
+import pearlhunter.PearlHunter; // PHunter
+import csput.CSPUTGeneticHiveHyperHeuristic; // GenHive
+
+// adapHH tools
+import be.kuleuven.kahosl.acceptance.AcceptanceCriterionType;
+import be.kuleuven.kahosl.selection.SelectionMethodType;
 
 public class HyflexRunner {
 
@@ -35,17 +39,23 @@ public class HyflexRunner {
             int[] initIndices
     ) {
         ProblemDomain problem = createDomain(domainName, seed);
-        HyperHeuristic hh = createHyperHeuristic(hhName, seed);
 
         if (problem == null) {
             throw new IllegalArgumentException("Unknown domain: " + domainName);
         }
+
+        problem.loadInstance(instanceId);
+        problem.setMemorySize(memorySize);
+
+        // Get actual heuristic count from the loaded domain
+        int numberOfHeuristics = problem.getNumberOfHeuristics();
+
+        HyperHeuristic hh = createHyperHeuristic(hhName, seed, timeLimitMs, numberOfHeuristics);
+
         if (hh == null) {
             throw new IllegalArgumentException("Unknown hyper-heuristic: " + hhName);
         }
 
-        problem.loadInstance(instanceId);
-        problem.setMemorySize(memorySize);
         for (int idx : initIndices) {
             problem.initialiseSolution(idx);
         }
@@ -93,11 +103,18 @@ public class HyflexRunner {
         }
     }
 
-    private HyperHeuristic createHyperHeuristic(String hhName, long seed) {
+    private HyperHeuristic createHyperHeuristic(String hhName, long seed, long timeLimitMs, int numberOfHeuristics) {
         switch (hhName.toLowerCase()) {
             case "adaphh":
             case "adapthh":
-                return new GIHH(seed);
+                return new GIHH(
+                    seed,
+                    numberOfHeuristics,                                        // actual count from domain
+                    timeLimitMs,                                               // totalExecTime in ms
+                    "GIHH",                                                    // resultFileName
+                    SelectionMethodType.AdaptiveLimitedLAassistedDHSMentorSTD,
+                    AcceptanceCriterionType.AdaptiveIterationLimitedListBasedTA
+                );
             case "phunter":
                 return new PearlHunter(seed);
             case "genhive":

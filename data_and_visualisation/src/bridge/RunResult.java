@@ -16,6 +16,18 @@ public class RunResult {
 
     public RunResult() {}
 
+    // Getters for py4j compatibility
+    public String getHyperHeuristicName() { return hyperHeuristicName; }
+    public String getDomainName()         { return domainName; }
+    public long   getSeed()               { return seed; }
+    public int    getInstanceId()         { return instanceId; }
+    public long   getTimeLimitMs()        { return timeLimitMs; }
+    public int    getMemorySize()         { return memorySize; }
+    public int[]  getInitIndices()        { return initIndices; }
+    public double getWallTimeSeconds()    { return wallTimeSeconds; }
+    public double getBestValue()          { return bestValue; }
+    public String getBestSolutionString() { return bestSolutionString; }
+
     @Override
     public String toString() {
         return "RunResult{" +
