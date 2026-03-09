@@ -1,0 +1,14 @@
+dependencies {
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
+    implementation group: 'com.thoughtworks.xstream', name: 'xstream', version: '1.4.15'
+}
+
+sourceSets {
+    main {
+        java {
+            // srcDir 'src'
+            exclude '**/be/kuleuven/kahosl/jppf/CHClient.java'
+            exclude '**/be/kuleuven/kahosl/jppf/CHTask.java'
+       }
+   }
+}
