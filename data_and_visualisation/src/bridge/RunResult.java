@@ -1,6 +1,7 @@
 package bridge;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class RunResult {
     public String hyperHeuristicName;
@@ -13,6 +14,9 @@ public class RunResult {
     public double wallTimeSeconds;
     public double bestValue;
     public String bestSolutionString;
+    public List<Double> fitnessTrace;
+    public int[] heuristicCallCounts;
+    public int[] heuristicCallTimes;
 
     public RunResult() {}
 
@@ -27,20 +31,31 @@ public class RunResult {
     public double getWallTimeSeconds()    { return wallTimeSeconds; }
     public double getBestValue()          { return bestValue; }
     public String getBestSolutionString() { return bestSolutionString; }
+    public List<Double> getFitnessTrace() { return fitnessTrace; }
+    public int[] getHeuristicCallCounts() { return heuristicCallCounts; }
+    public int[] getHeuristicCallTimes() { return heuristicCallTimes; }
+
+    // Setters for py4j compatability
+    public void setFitnessTrace(List<Double> t) { this.fitnessTrace = t; }
+    public void setHeuristicCallCounts(int[] c) { this.heuristicCallCounts = c; }
+    public void setHeuristicCallTimes(int[] t) { this.heuristicCallTimes = t; }
 
     @Override
     public String toString() {
         return "RunResult{" +
                 "hyperHeuristicName='" + hyperHeuristicName + '\'' +
-                ", domainName='" + domainName + '\'' +
-                ", seed=" + seed +
-                ", instanceId=" + instanceId +
-                ", timeLimitMs=" + timeLimitMs +
-                ", memorySize=" + memorySize +
-                ", initIndices=" + Arrays.toString(initIndices) +
-                ", wallTimeSeconds=" + wallTimeSeconds +
-                ", bestValue=" + bestValue +
+                ", domainName='"       + domainName          + '\'' +
+                ", seed="              + seed                       +
+                ", instanceId="        + instanceId                 +
+                ", timeLimitMs="       + timeLimitMs                +
+                ", memorySize="        + memorySize                 +
+                ", initIndices="       + Arrays.toString(initIndices)     +
+                ", wallTimeSeconds="   + wallTimeSeconds             +
+                ", bestValue="         + bestValue                  +
                 ", bestSolutionString='" + bestSolutionString + '\'' +
+                ", fitnessTrace.size=" + (fitnessTrace      != null ? fitnessTrace.size()              : "null") +
+                ", heuristicCallCounts=" + Arrays.toString(heuristicCallCounts)                                  +
+                ", heuristicCallTimes="  + Arrays.toString(heuristicCallTimes)                                   +
                 '}';
     }
 }

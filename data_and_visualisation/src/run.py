@@ -218,7 +218,7 @@ if __name__ == "__main__":
     run_hyflex_all_domains(
         n_runs=30,
         seed=42,
-        time_limit_ms=30000,
+        time_limit_ms=120000,
         instances={
             "SAT": 0,
             "VRP": 0,

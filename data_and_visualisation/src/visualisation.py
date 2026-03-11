@@ -99,6 +99,7 @@ def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_med
         plt.grid(True)
         if show_median and len(traces) >= 2:
             plt.legend()
+        plt.yscale("log")
         plt.tight_layout()
         plt.show()
 
@@ -169,6 +170,7 @@ def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str):
         plt.xlabel("Heuristic ID")
         plt.ylabel(ylabel)
         plt.grid(True, axis="y")
+        plt.yscale("log")
         plt.tight_layout()
         plt.show()
 
