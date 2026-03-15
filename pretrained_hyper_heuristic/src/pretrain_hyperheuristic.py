@@ -100,14 +100,14 @@ def build_state(hh: "PreTrainedHH", h_count: int) -> HHState:
     wor  = np.array([s.worsen_ema for s in stats], dtype=np.float32)
     tail = np.array([hh.tail_system.score(i) for i in range(h_count)], dtype=np.float32)
 
-    # Recency: iteartions since last used, normalised by stall threshold
+    # Recency: iterations since last used, normalised by stall threshold
     horizon = max(1, hh.cfg.stall_iterations_to_restart)
     rec = np.array([
         min(1.0, (hh.iteration - s.last_used_iter) / horizon)
         for s in stats
     ], dtype=np.float32)
 
-    # Normalise ema arrays to [-1,1] range for stable training
+    # Normalise EMA (Exponential Moving Average) arrays to [-1,1] range for stable training
     def _norm(v: np.ndarray) -> np.ndarray:
         span = v.max() - v.min()
         if span < 1e-9:
@@ -646,11 +646,20 @@ class PreTrainer:
         # §2+§1: Keras surrogate train/test split
         if self.use_surrogate and self.surrogate_model is not None:
             print("[PreTrainer] Training Keras surrogate model...")
-            X, A, R, X_nxt = collector.to_numpy(self.h_count)
+            # X, A, R, X_nxt
+            X, _, _, _ = collector.to_numpy(self.h_count)
             Y = collector.build_q_targets(self.qt, gamma=self.qt.gamma)
 
             history, test_loss = train_surrogate(self.surrogate_model, X, Y, epochs=self.surrogate_epochs) # Need to tweak history, give a purpose
-            print(f"[PreTrainer] Surrogate test MSE: {test_loss:.6f}")
+            
+            # ← Use history for overfitting diagnostic
+            final_train_loss = history.history["loss"][-1]
+            final_val_loss   = history.history["val_loss"][-1]
+            print(
+                f"[PreTrainer] Train MSE: {final_train_loss:.6f} | "
+                f"Val MSE: {final_val_loss:.6f} | "
+                f"Test MSE: {test_loss:.6f}"
+            )
             
             # Inject surrogate predictions back into Q-Table (warm-start overlap)
             surrogate_to_qtable(self.surrogate_model, self.qt, X)
@@ -696,8 +705,9 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
             eps_min:     float = 0.02,
             decay_steps: int   = 2000,
     ):
+        self._injected_qtable = qtable   # **Check: stash it first
         super().__init__(seed=seed, config=config)
-        self.qtable: Optional[QTable] = qtable
+        self.qtable: Optional[QTable] = self._injected_qtable  # **Check: restore after super().__init__
 
         self.eps_schedule = EpsilonSchedule(
             eps_start=eps_start,
@@ -717,6 +727,8 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
         self.sliding_window: deque = deque(maxlen=50)
         self.sliding_variance: float = 0.0
 
+        self._pre_action_state: Optional[np.ndarray] = None
+
         # Hook for offline data collection (set by OfflineCollector)
         self._transition_hook = None
 
@@ -734,6 +746,8 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
             # Preserve any existing windows
             for i in range(min(h_count, len(old_windows))):
                 self.tail_system._windows[i] = old_windows[i]
+        if hasattr(self, '_injected_qtable') and self._injected_qtable is not None:
+            self.qtable = self._injected_qtable
 
     # ------------------------------------------------------------------
     # §10+§11: Override _select_heuristic
@@ -741,6 +755,12 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
     def _select_heuristic(self, h_count: int, prev_h) -> int:
         # Update ε
         self.epsilon = self.eps_schedule.step()
+
+        self._pre_action_state = build_state(self, h_count).as_vector()
+
+        if self.qtable is not None:
+            q_vals = self.qtable.q_values(self._pre_action_state)
+            print(f"Q-value range: {q_vals.min():.4f} to {q_vals.max():.4f}")
 
         # §8: Perturbation override
         stall = self.iteration - self.last_improve_iter
@@ -755,7 +775,7 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
 
         # Q-Table guided selection (if available)
         if self.qtable is not None:
-            state_vec = build_state(self, h_count).as_vector()
+            state_vec = self._pre_action_state
             tabu_set  = set(self.tabu)
             q_vals    = self.qtable.q_values(state_vec).copy()
 
@@ -793,10 +813,12 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
                 self.tail_system.set_window(new_win)
 
         # §10: Online Q-Table update
-        if self.qtable is not None:
-            h_count   = len(self.h_stats)
-            state_vec = build_state(self, h_count).as_vector()
-            reward    = shaped_reward(
+        # Guard: _pre_action_state must exist (set in _select_heuristic)
+        if self._pre_action_state is not None:
+            h_count = len(self.h_stats)
+            state_vec = self._pre_action_state
+            next_state_vec = build_state(self, h_count).as_vector()
+            reward = shaped_reward(
                 before=before, after=after,
                 best_ever=self.best_fitness,
                 accepted=accepted,
@@ -804,18 +826,41 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
                 iter_since_improve=self.iteration - self.last_improve_iter,
                 max_stall=self.cfg.stall_iterations_to_restart,
             )
-            # We can't get next_state until next iteration; approximate with current
-            next_state_vec = state_vec # approximation; replace with deferred update if needed
-            self.qtable.update(state_vec, h, reward, next_state_vec)
+            # Online Q update only during deployment (qtable exists)
+            if self.qtable is not None:
+                self.qtable.update(state_vec, h, reward, next_state_vec)
 
-            # Fire transition hook (for offline collection)
+            # Hook fires regardless — offline collector needs it even without a qtable
             if self._transition_hook is not None:
                 self._transition_hook(Transition(
                     state_vec=state_vec,
                     action=h,
                     reward=reward,
-                    next_state_vec=next_state_vec
+                    next_state_vec=next_state_vec,
                 ))
+        # if self.qtable is not None and self._pre_action_state is not None:
+        #     h_count = len(self.h_stats)
+        #     state_vec = self._pre_action_state
+        #     next_state_vec = build_state(self, h_count).as_vector()
+        #     reward    = shaped_reward(
+        #         before=before, after=after,
+        #         best_ever=self.best_fitness,
+        #         accepted=accepted,
+        #         improved_global=(after < self.best_fitness),
+        #         iter_since_improve=self.iteration - self.last_improve_iter,
+        #         max_stall=self.cfg.stall_iterations_to_restart,
+        #     )
+        #     # We can't get next_state until next iteration; approximate with current
+        #     self.qtable.update(state_vec, h, reward, next_state_vec)
+
+        #     # Fire transition hook (for offline collection)
+        #     if self._transition_hook is not None:
+        #         self._transition_hook(Transition(
+        #             state_vec=state_vec,
+        #             action=h,
+        #             reward=reward,
+        #             next_state_vec=next_state_vec
+        #         ))
 
         # §9: Reset degenerate heuristic rows
         if self.qtable is not None:

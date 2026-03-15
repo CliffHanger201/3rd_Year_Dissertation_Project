@@ -30,7 +30,7 @@ from python_hyper_heuristic.domains.Python.BinPacking.BinPacking import BinPacki
 from python_hyper_heuristic.domains.Python.TSP.TSP import TSP
 
 # ── Pre-training imports ───────────────────────────────────────────────────────
-from pretrained_hyper_heuristic.src.pretrain_hyperheuristic import PreTrainedHH, HHConfig, pretrain_and_deploy
+from pretrained_hyper_heuristic.src.pretrain_hyperheuristic import PreTrainedHH, HHConfig, pretrain_and_deploy, HAS_KERAS
 
 
 # =============================================================================
@@ -126,22 +126,33 @@ def pretrain_domain(
     use_surrogate:      bool           = False,
     qtable_save_path:   Optional[str]  = None,
     config:             Optional[HHConfig] = None,
+    test_instance:      int            = 0,        # ← NEW: for guard check
 ) -> PreTrainedHH:
     """
-    Build training problem instances then call pretrain_and_deploy().
+    Build training problem instances and run offline collection n_pretrain_runs
+    times, rebuilding problems with a fresh seed each run for genuine variation.
 
     Parameters
     ----------
     train_instance_ids : instance IDs for offline data collection.
                          Must NOT include the test instance (default: 0).
     pretrain_time_ms   : wall-clock budget (ms) per training instance.
-    n_pretrain_runs    : how many times to run offline collection per instance.
+    n_pretrain_runs    : how many times to run offline collection.
                          More runs = richer Q-Table coverage before deployment.
+    test_instance      : held-out instance — raises an error if found in
+                         train_instance_ids to prevent data leakage.
 
     Returns
     -------
-    PreTrainedHH  – warm-started and switched to online mode (small epsilon).
+    PreTrainedHH - warm-started and switched to online mode (small epsilon).
     """
+    # Guard: test instance must never appear in training
+    if test_instance in train_instance_ids:
+        raise ValueError(
+            f"Test instance {test_instance} must not appear in "
+            f"train_instance_ids {train_instance_ids} — this would leak test data."
+        )
+
     # Derive h_count directly from the domain so it can never mismatch
     _probe    = domain_cls(seed=seed)
     _probe.loadInstance(train_instance_ids[0])
@@ -149,24 +160,43 @@ def pretrain_domain(
     state_dim = 4 * h_count + 3   # matches HHState.as_vector() layout
 
     print(f"\n[PreTrain:{domain_name}] h_count={h_count} (from domain)")
-    print(f"[PreTrain:{domain_name}] Instances={train_instance_ids}, runs_per_instance={n_pretrain_runs}")
+    print(f"[PreTrain:{domain_name}] Instances={train_instance_ids}, runs={n_pretrain_runs}")
 
-    training_problems = [
-        _init_problem(domain_cls, seed + i, inst_id, memory_size, init_indices)
-        for i, inst_id in enumerate(train_instance_ids)
-    ]
+    # Build PreTrainer once — Q-Table accumulates across ALL runs
+    from pretrained_hyper_heuristic.src.pretrain_hyperheuristic import PreTrainer
 
-    hh = pretrain_and_deploy(
-        training_problems=training_problems,
+    def _factory():
+        return PreTrainedHH(config=config)
+
+    trainer = PreTrainer(
         h_count=h_count,
+        hh_factory=_factory,
         state_dim=state_dim,
-        time_limit_ms=pretrain_time_ms,
-        n_pretrain_runs=n_pretrain_runs,
-        qtable_save_path=qtable_save_path,
-        use_surrogate=use_surrogate,
-        config=config,
+        use_surrogate=use_surrogate and HAS_KERAS,
     )
 
+    # ── Loop here: rebuild problems with a fresh seed each run ──────────────
+    for run_idx in range(n_pretrain_runs):
+        # Different seed each run = different starting conditions each time
+        run_problems = [
+            _init_problem(
+                domain_cls,
+                seed + run_idx * 100 + i,   # ← unique seed per run
+                inst_id,
+                memory_size,
+                init_indices,
+            )
+            for i, inst_id in enumerate(train_instance_ids)
+        ]
+        print(f"[PreTrain:{domain_name}] Run {run_idx + 1}/{n_pretrain_runs} "
+              f"(seeds {[seed + run_idx * 100 + i for i in range(len(train_instance_ids))]})")
+
+        trainer.run_offline(run_problems, time_limit_ms=pretrain_time_ms)
+
+    if qtable_save_path:
+        trainer.save_qtable(qtable_save_path)
+
+    hh = trainer.make_deployment_hh(config=config)
     n_states = len(hh.qtable.table) if hh.qtable else 0
     print(f"[PreTrain:{domain_name}] Done — {n_states} Q-Table state entries.")
     return hh
@@ -210,6 +240,9 @@ def run_one_eval(
 
     hh.setTimeLimit(time_limit_ms)
     hh.loadProblemDomain(problem)
+
+    assert hh.qtable is not None, "Q-Table was wiped by loadProblemDomain!"  # Verifying if Q-Table exists
+    assert len(hh.qtable.table) > 0, "Q-Table is empty after load!"          # Verifying if Q-Table exists
 
     t0 = time.time()
     hh.run()
@@ -268,8 +301,8 @@ def run_pretrained_all_domains(
     domain_specs = [
         ("SAT",        SAT),
         ("VRP",        VRP),
-        ("BinPacking", BinPacking),
         ("TSP",        TSP),
+        ("BinPacking", BinPacking),
     ]
 
     os.makedirs(qtable_dir, exist_ok=True)
@@ -298,7 +331,8 @@ def run_pretrained_all_domains(
             n_pretrain_runs=n_pretrain_runs,
             use_surrogate=use_surrogate,
             config=config,
-            qtable_save_path=os.path.join(qtable_dir, f"qtable_{name.lower()}.pkl"),
+            test_instance=test_instance,
+            qtable_save_path=os.path.join(qtable_dir, f"qtable_{name}.pkl"),
         )
 
     # ── Phase 2: Evaluate ─────────────────────────────────────────────────────
@@ -308,8 +342,8 @@ def run_pretrained_all_domains(
     print("=" * 60)
 
     for run_id in range(n_runs):
-        seed = seed + run_id
-        print(f"\n── Run {run_id + 1}/{n_runs}  (seed={seed}) ──")
+        seed = seed + run_id      # Revert back into base_seed later
+        print(f"\n── Run {run_id + 1}/{n_runs}  (seed={seed}) ──")      # Revert back into base_seed later
 
         for name, cls in domain_specs:
             res = run_one_eval(
@@ -326,14 +360,14 @@ def run_pretrained_all_domains(
             all_results[name].append(res)
             print(f"  [{name:12s}]  best={res.best_value:.4f}  wall={res.wall_time_s:.2f}s")
 
-    # ── Save JSON ──────────────────────────────────────────────────────────────
+    # ── Save JSON ─────────────────────────────────────────────────────────────
     payload = {
         name: [asdict(r) for r in runs]
         for name, runs in all_results.items()
     }
     payload["_meta"] = {
         "n_runs":             n_runs,
-        "seed":          seed,
+        "base_seed":          seed,         # Revert back into base_seed later
         "time_limit_ms":      time_limit_ms,
         "pretrain_time_ms":   pretrain_time_ms,
         "n_pretrain_runs":    n_pretrain_runs,
@@ -360,7 +394,7 @@ if __name__ == "__main__":
         n_runs=30,
         seed=42,
         time_limit_ms=30000,
-        pretrain_time_ms=5000,          # budget per training instance during collection
+        pretrain_time_ms=30000,          # budget per training instance during collection
         n_pretrain_runs=5,              # ← 5 runs × 4 instances = 20 total pre-training runs
         test_instance=0,                 # held-out, never seen during pre-training
         train_instance_ids=[1, 2, 3, 4],
