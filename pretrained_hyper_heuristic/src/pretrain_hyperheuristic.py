@@ -24,6 +24,8 @@ ONLINE DEPLOYMENT
   (Note: Code format is different but same architecture)
 """
 
+from __future__ import annotations
+
 import math
 import random
 import pickle  # Serialises Python objects into binary files to be saves or reloaded
@@ -145,6 +147,8 @@ class TailSystem:
         self._windows[h].append(1.0 if improved else 0.0)
 
     def score(self, h: int) -> float:
+        if h < 0 or h >= len(self._windows):
+            return 0.5  # uninformative prior for out-of-range heuristic
         w = self._windows[h]
         return float(np.mean(w)) if w else 0.5  # uninformative prior = 0.5
     
@@ -620,7 +624,7 @@ class PreTrainer:
     def run_offline(
         self,
         training_problems: List[ProblemDomain],
-        time_limit_ms:     int = 5_000,
+        time_limit_ms:     int = 5000,
     ) -> None:
         """§1: Collect data + §3: offline Q updates + §2: Keras fit."""
         print("[PreTrainer] Collecting offline transitions...")
@@ -719,15 +723,22 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
     # ------------------------------------------------------------------
     # Override _init_stats to also initialise tail system
     # ------------------------------------------------------------------
-    def _init_stats(self, h_count) -> None:
+    def _init_stats(self, h_count: int) -> None:
         super()._init_stats(h_count)
         if self.tail_system is None:
             self.tail_system = TailSystem(h_count, window=20)
+        elif self.tail_system.h_count != h_count:
+            # Tail system was pre-built with a different h_count — resize it
+            old_windows = self.tail_system._windows
+            self.tail_system = TailSystem(h_count, window=self.tail_system.window)
+            # Preserve any existing windows
+            for i in range(min(h_count, len(old_windows))):
+                self.tail_system._windows[i] = old_windows[i]
 
     # ------------------------------------------------------------------
     # §10+§11: Override _select_heuristic
     # ------------------------------------------------------------------
-    def _select_heuristic(self, h_count, prev_h) -> int:
+    def _select_heuristic(self, h_count: int, prev_h) -> int:
         # Update ε
         self.epsilon = self.eps_schedule.step()
 
@@ -827,16 +838,18 @@ def pretrain_and_deploy(
     training_problems:  List[ProblemDomain],
     h_count:            int,
     state_dim:          int,
-    time_limit_ms:      int   = 5_000,
+    time_limit_ms:      int           = 30000,
+    n_pretrain_runs:    int           = 5,        
     qtable_save_path:   Optional[str] = None,
-    use_surrogate:      bool  = True,
+    use_surrogate:      bool          = True,
     config:             Optional[HHConfig] = None,
 ) -> PreTrainedHH:
     """
     One-liner convenience wrapper:
- 
-        hh = pretrain_and_deploy(training_problems, h_count=8, state_dim=35)
-        hh.setTimeLimit(30_000)
+
+        hh = pretrain_and_deploy(training_problems, h_count=8, state_dim=35,
+                                 n_pretrain_runs=5)
+        hh.setTimeLimit(30000)
         hh.loadProblemDomain(test_problem)
         hh.run()
         print(hh.getBestSolutionValue())
@@ -850,7 +863,12 @@ def pretrain_and_deploy(
         state_dim=state_dim,
         use_surrogate=use_surrogate and HAS_KERAS,
     )
-    trainer.run_offline(training_problems, time_limit_ms=time_limit_ms)
+
+    # Run offline collection n_pretrain_runs times
+    # Q-Table accumulates experience across all runs
+    for run_idx in range(n_pretrain_runs):
+        print(f"[pretrain_and_deploy] Pre-training run {run_idx + 1}/{n_pretrain_runs} ...")
+        trainer.run_offline(training_problems, time_limit_ms=time_limit_ms)
 
     if qtable_save_path:
         trainer.save_qtable(qtable_save_path)
