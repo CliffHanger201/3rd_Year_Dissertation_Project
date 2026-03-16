@@ -732,10 +732,21 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
             eps_start:   float = 0.3,      # lower default for online
             eps_min:     float = 0.02,
             decay_steps: int   = 2000,
+            run_number:  int   = 1,
     ):
         self._injected_qtable = qtable   # **Check: stash it first
         super().__init__(seed=seed, config=config)
         self.qtable: Optional[QTable] = self._injected_qtable  # **Check: restore after super().__init__
+        self.run_number = run_number
+
+        # Logarithmic CF decay — CF dominates early, Q-Table takes over later
+        # Linear Q weight growth ensures poor branches still get CF guidance
+        if HAS_KERAS:
+            self.cf_weight = 0.5 / (1.0 + math.log(run_number))   # run 1≈0.5, run 30≈0.29
+            self.q_weight  = 1.0 - self.cf_weight            # run 1≈0.0, run 30≈0.71
+        else:
+            self.cf_weight = 1.0 / (1.0 + math.log(run_number))   # run 1≈0.5, run 30≈0.29
+            self.q_weight  = 1.0 - self.cf_weight            # run 1≈0.0, run 30≈0.71
 
         self.eps_schedule = EpsilonSchedule(
             eps_start=eps_start,
@@ -805,7 +816,6 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
         if self.qtable is not None:
             state_vec = self._pre_action_state
             tabu_set  = set(self.tabu)
-            q_vals    = self.qtable.q_values(state_vec).copy()
 
             # Blend Q-values with CF scores for robustness
             # for h in range(h_count):
@@ -830,17 +840,20 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
             q_norm  = _normalise(q_vals)
             cf_norm = _normalise(cf_scores)
 
-            blended = 0.6 * q_norm + 0.4 * cf_norm
+            # Blend Q-values with CF scores for robustness
+            blended = self.q_weight * q_norm + self.cf_weight * cf_norm
 
             # Apply tabu mask after blending
             for h in tabu_set:
                 blended[h] = -float("inf")
 
-                return int(np.argmax(q_vals))
-            
-            print(f"Q-norm range: {q_norm.min():.4f} to {q_norm.max():.4f}")
-            print(f"CF-norm range: {cf_norm.min():.4f} to {cf_norm.max():.4f}")
-            print(f"Blended range: {blended.min():.4f} to {blended.max():.4f}")
+            # Diagnostic Prints
+            # print(f"Q-norm range: {q_norm.min():.4f} to {q_norm.max():.4f}")
+            # print(f"CF-norm range: {cf_norm.min():.4f} to {cf_norm.max():.4f}")
+            # print(f"Blended range: {blended.min():.4f} to {blended.max():.4f}")
+            # print(f"q_weight={self.q_weight:.4f} cf_weight={self.cf_weight:.4f} sum={self.q_weight+self.cf_weight:.4f}")
+
+            return int(np.argmax(blended))
  
         # Fallback: parent CF selection
         return super()._select_heuristic(h_count, prev_h)

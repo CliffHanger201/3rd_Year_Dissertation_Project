@@ -217,6 +217,7 @@ def run_one_eval(
     memory_size:   int           = 2,
     init_indices:  Sequence[int] = (0, 1),
     config:        Optional[HHConfig] = None,
+    run_number:    int           = 1,
 ) -> DomainRunResult:
     """
     One evaluation episode.
@@ -235,6 +236,7 @@ def run_one_eval(
         qtable=pretrained_hh.qtable,      # shared warm-started Q-Table
         eps_start=0.05,
         eps_min=0.01,
+        run_number=run_number,
     )
     hh.tail_system = pretrained_hh.tail_system   # carry over tail memory
 
@@ -356,6 +358,7 @@ def run_pretrained_all_domains(
                 memory_size=memory_size,
                 init_indices=init_indices,
                 config=config,
+                run_number=run_id + 1,
             )
             all_results[name].append(res)
             print(f"  [{name:12s}]  best={res.best_value:.4f}  wall={res.wall_time_s:.2f}s")
@@ -391,16 +394,16 @@ def run_pretrained_all_domains(
 
 if __name__ == "__main__":
     run_pretrained_all_domains(
-        n_runs=10,
+        n_runs=30,
         seed=42,
-        time_limit_ms=10000,
-        pretrain_time_ms=10000,          # budget per training instance during collection
+        time_limit_ms=120000,
+        pretrain_time_ms=120000,          # budget per training instance during collection
         n_pretrain_runs=5,              # ← 5 runs × 4 instances = 20 total pre-training runs
         test_instance=0,                 # held-out, never seen during pre-training
         train_instance_ids=[1, 2, 3, 4],
         memory_size=2,
         init_indices=(0, 1),
-        use_surrogate=False,             # set True if TensorFlow is installed
+        use_surrogate=True,             # set True if TensorFlow is installed
         qtable_dir="qtables",
         out_json_path="results/pretrained_hh_all_domains_results.json",
     )
