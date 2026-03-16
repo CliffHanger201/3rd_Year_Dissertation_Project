@@ -71,10 +71,10 @@ class HHState:
     All values are normalised to [0, 1] for inter-domain transfer.
     """
     # --- per-heuristic features (h_count values each) ---
-    reward_ema:     np.ndarray = field(default_factory=lambda: np.zeros(1))
-    worsen_ema:     np.ndarray = field(default_factory=lambda: np.zeros(1))
-    tail_score:     np.ndarray = field(default_factory=lambda: np.zeros(1))  # §7
-    recency_norm:   np.ndarray = field(default_factory=lambda: np.zeros(1))
+    best_reward_ema:  float = 0.0   # max across all heuristics
+    worst_reward_ema: float = 0.0   # min across all heuristics
+    best_tail_score:  float = 0.0   # max tail score across all heuristics
+    reward_spread:    float = 0.0   # max - min EMA (how decisive the preference is)
 
     # --- global scalar features ---
     phase_flag:     float = 0.0   # 0 = intensify, 1 = diversify
@@ -83,49 +83,77 @@ class HHState:
 
     def as_vector(self) -> np.ndarray:
         """Flatten to 1-D array; used by both Q-Table bucketing and Keras."""
-        return np.concatenate([
-            self.reward_ema,
-            self.worsen_ema,
-            self.tail_score,
-            self.recency_norm,
-            [self.phase_flag, self.stall_norm, self.epsilon],
-        ])
-    
+        return np.array([
+            self.best_reward_ema,
+            self.worst_reward_ema,
+            self.best_tail_score,
+            self.reward_spread,
+            self.phase_flag,
+            self.stall_norm,
+            self.epsilon,
+        ], dtype=np.float32)
+
 def build_state(hh: "PreTrainedHH", h_count: int) -> HHState:
     """Extract a normalised HHState from a live PreTrainedHH instance."""
     stats = hh.h_stats
 
-    # Raw per-heuristic arrays
+    stats = hh.h_stats
     rew  = np.array([s.reward_ema for s in stats], dtype=np.float32)
-    wor  = np.array([s.worsen_ema for s in stats], dtype=np.float32)
     tail = np.array([hh.tail_system.score(i) for i in range(h_count)], dtype=np.float32)
 
-    # Recency: iterations since last used, normalised by stall threshold
-    horizon = max(1, hh.cfg.stall_iterations_to_restart)
-    rec = np.array([
-        min(1.0, (hh.iteration - s.last_used_iter) / horizon)
-        for s in stats
-    ], dtype=np.float32)
-
-    # Normalise EMA (Exponential Moving Average) arrays to [-1,1] range for stable training
     def _norm(v: np.ndarray) -> np.ndarray:
         span = v.max() - v.min()
         if span < 1e-9:
             return np.zeros_like(v)
         return (v - v.min()) / span * 2.0 - 1.0
-    
+
+    rew_norm = _norm(rew)
+
+    horizon    = max(1, hh.cfg.stall_iterations_to_restart)
     phase_flag = 1.0 if hh.phase == Phase.DIVERSIFY else 0.0
     stall_norm = min(1.0, (hh.iteration - hh.last_improve_iter) / horizon)
 
     return HHState(
-        reward_ema=_norm(rew),
-        worsen_ema=_norm(wor),
-        tail_score=_norm(tail),
-        recency_norm=rec,
+        best_reward_ema=float(rew_norm.max()),
+        worst_reward_ema=float(rew_norm.min()),
+        best_tail_score=float(tail.max()),
+        reward_spread=float(rew_norm.max() - rew_norm.min()),
         phase_flag=phase_flag,
         stall_norm=stall_norm,
         epsilon=hh.epsilon,
     )
+
+    # # Raw per-heuristic arrays
+    # rew  = np.array([s.reward_ema for s in stats], dtype=np.float32)
+    # wor  = np.array([s.worsen_ema for s in stats], dtype=np.float32)
+    # tail = np.array([hh.tail_system.score(i) for i in range(h_count)], dtype=np.float32)
+
+    # # Recency: iterations since last used, normalised by stall threshold
+    # horizon = max(1, hh.cfg.stall_iterations_to_restart)
+    # rec = np.array([
+    #     min(1.0, (hh.iteration - s.last_used_iter) / horizon)
+    #     for s in stats
+    # ], dtype=np.float32)
+
+    # # Normalise EMA (Exponential Moving Average) arrays to [-1,1] range for stable training
+    # def _norm(v: np.ndarray) -> np.ndarray:
+    #     span = v.max() - v.min()
+    #     if span < 1e-9:
+    #         return np.zeros_like(v)
+    #     return (v - v.min()) / span * 2.0 - 1.0
+    
+    # phase_flag = 1.0 if hh.phase == Phase.DIVERSIFY else 0.0
+    # stall_norm = min(1.0, (hh.iteration - hh.last_improve_iter) / horizon)
+
+    # return HHState(
+    #     reward_ema=_norm(rew),
+    #     worsen_ema=_norm(wor),
+    #     tail_score=_norm(tail),
+    #     recency_norm=rec,
+    #     phase_flag=phase_flag,
+    #     stall_norm=stall_norm,
+    #     epsilon=hh.epsilon,
+    # )
 
 # ============================================================================
 # §7  TAIL SYSTEM  –  sliding-window performance memory per heuristic
@@ -433,8 +461,8 @@ class EpsilonSchedule:
 
     def __init__(
         self,
-        eps_start:   float = 1.0,
-        eps_min:     float = 0.02,
+        eps_start:   float = 0.05,
+        eps_min:     float = 0.01,
         decay_steps: int   = 5000,
         eps_online:  float = 0.05, # re-introduced ε for online phase
     ):
@@ -758,9 +786,9 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
 
         self._pre_action_state = build_state(self, h_count).as_vector()
 
-        if self.qtable is not None:
-            q_vals = self.qtable.q_values(self._pre_action_state)
-            print(f"Q-value range: {q_vals.min():.4f} to {q_vals.max():.4f}")
+        # if self.qtable is not None:
+        #     q_vals = self.qtable.q_values(self._pre_action_state)
+        #     print(f"Q-value range: {q_vals.min():.4f} to {q_vals.max():.4f}")
 
         # §8: Perturbation override
         stall = self.iteration - self.last_improve_iter
@@ -780,13 +808,39 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
             q_vals    = self.qtable.q_values(state_vec).copy()
 
             # Blend Q-values with CF scores for robustness
-            for h in range(h_count):
-                cf_score = self._choice_function_score(h, prev_h)
-                q_vals[h] = 0.6 * q_vals[h] + 0.4 * cf_score
-                if h in tabu_set:
-                    q_vals[h] = -float("inf")
+            # for h in range(h_count):
+            #     cf_score = self._choice_function_score(h, prev_h)
+            #     q_vals[h] = 0.6 * q_vals[h] + 0.4 * cf_score
+            #     if h in tabu_set:
+            #         q_vals[h] = -float("inf")
+            q_vals    = self.qtable.q_values(state_vec).copy()
+            cf_scores = np.array([
+                self._choice_function_score(h, prev_h)
+                for h in range(h_count)
+            ], dtype=np.float32)
 
-            return int(np.argmax(q_vals))
+            # Normalise both to [0, 1] before blending so CF recency
+            # growth cannot swamp Q-Table signal over time
+            def _normalise(v: np.ndarray) -> np.ndarray:
+                span = v.max() - v.min()
+                if span < 1e-9:
+                    return np.zeros_like(v)
+                return (v - v.min()) / span
+
+            q_norm  = _normalise(q_vals)
+            cf_norm = _normalise(cf_scores)
+
+            blended = 0.6 * q_norm + 0.4 * cf_norm
+
+            # Apply tabu mask after blending
+            for h in tabu_set:
+                blended[h] = -float("inf")
+
+                return int(np.argmax(q_vals))
+            
+            print(f"Q-norm range: {q_norm.min():.4f} to {q_norm.max():.4f}")
+            print(f"CF-norm range: {cf_norm.min():.4f} to {cf_norm.max():.4f}")
+            print(f"Blended range: {blended.min():.4f} to {blended.max():.4f}")
  
         # Fallback: parent CF selection
         return super()._select_heuristic(h_count, prev_h)

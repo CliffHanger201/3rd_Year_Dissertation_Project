@@ -157,7 +157,7 @@ def pretrain_domain(
     _probe    = domain_cls(seed=seed)
     _probe.loadInstance(train_instance_ids[0])
     h_count   = _probe.getNumberOfHeuristics()
-    state_dim = 4 * h_count + 3   # matches HHState.as_vector() layout
+    state_dim = 7   # matches HHState.as_vector() layout
 
     print(f"\n[PreTrain:{domain_name}] h_count={h_count} (from domain)")
     print(f"[PreTrain:{domain_name}] Instances={train_instance_ids}, runs={n_pretrain_runs}")
@@ -391,10 +391,10 @@ def run_pretrained_all_domains(
 
 if __name__ == "__main__":
     run_pretrained_all_domains(
-        n_runs=30,
+        n_runs=10,
         seed=42,
-        time_limit_ms=30000,
-        pretrain_time_ms=30000,          # budget per training instance during collection
+        time_limit_ms=10000,
+        pretrain_time_ms=10000,          # budget per training instance during collection
         n_pretrain_runs=5,              # ← 5 runs × 4 instances = 20 total pre-training runs
         test_instance=0,                 # held-out, never seen during pre-training
         train_instance_ids=[1, 2, 3, 4],
