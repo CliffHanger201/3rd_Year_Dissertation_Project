@@ -1,12 +1,14 @@
 """
 multi_visualisation.py
 ======================
-Compares AdapHH, PHunter, GenHive (Java) and the custom Python HyperHeuristic
-across all HyFlex domains (SAT, VRP, TSP, BinPacking).
+Compares AdapHH, PHunter, GenHive (Java), the custom Python HyperHeuristic,
+and the Pretrained Python HyperHeuristic across all HyFlex domains
+(SAT, VRP, TSP, BinPacking).
 
 Data sources:
-  - results/java_hhs_all_domains_results.json   (keys: AdapHH, PHunter, GenHive)
-  - results/python_hh_all_domains_results.json  (keys: SAT, VRP, TSP, BinPacking)
+  - results/java_hhs_all_domains_results.json        (keys: AdapHH, PHunter, GenHive)
+  - results/python_hh_all_domains_results.json        (keys: SAT, VRP, TSP, BinPacking)
+  - results/pretrained_hh_all_domains_results.json    (keys: SAT, VRP, TSP, BinPacking)
 
 Plots produced per domain:
   1) Fitness traces  — median trace per HH overlaid on a single axes
@@ -20,13 +22,15 @@ import matplotlib.cm as cm
 
 # ── Config ──────────────────────────────────────────────────────────────────
 
-JAVA_FILE   = "results/java_hhs_all_domains_results.json"
-PYTHON_FILE = "results/python_hh_all_domains_results.json"
+JAVA_FILE       = "results/java_hhs_all_domains_results.json"
+PYTHON_FILE     = "results/python_hh_all_domains_results.json"
+PRETRAINED_FILE = "results/pretrained_hh_all_domains_results.json"
 
 DOMAINS     = ["SAT", "VRP", "TSP", "BinPacking"]
 
 JAVA_HHS    = ["AdapHH", "PHunter", "GenHive"]
-PYTHON_HH   = "MyHyperHeuristic"   # display label for the Python HH
+PYTHON_HH   = "MyHyperHeuristic"        # display label for the normal Python HH
+PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"  # display label for the pretrained HH
 
 # Colours assigned to each HH (consistent across all plots)
 HH_COLOURS  = {
@@ -34,6 +38,7 @@ HH_COLOURS  = {
     "PHunter":          "#3cb44b",
     "GenHive":          "#4363d8",
     PYTHON_HH:          "#f58231",
+    PRETRAINED_HH:      "#911eb4",
 }
 
 # ── Data loading helpers ─────────────────────────────────────────────────────
@@ -111,7 +116,7 @@ def collect_per_heuristic(runs, key):
 
 # ── Plot 1: Fitness traces ───────────────────────────────────────────────────
 
-def plot_fitness_traces(java_data, py_data):
+def plot_fitness_traces(java_data, py_data, pretrained_data):
     """One figure per domain; median trace per HH overlaid."""
     for domain in DOMAINS:
         fig, ax = plt.subplots(figsize=(11, 6))
@@ -127,12 +132,20 @@ def plot_fitness_traces(java_data, py_data):
                     color=HH_COLOURS[hh_name], linewidth=2)
             any_trace = True
 
-        # Python HH
+        # Normal Python HH
         py_runs  = get_python_runs(py_data, domain)
         py_trace = median_trace(py_runs)
         if py_trace is not None:
             ax.plot(py_trace, label=f"{PYTHON_HH} (median)",
                     color=HH_COLOURS[PYTHON_HH], linewidth=2, linestyle="--")
+            any_trace = True
+
+        # Pretrained Python HH
+        pre_runs  = get_python_runs(pretrained_data, domain)
+        pre_trace = median_trace(pre_runs)
+        if pre_trace is not None:
+            ax.plot(pre_trace, label=f"{PRETRAINED_HH} (median)",
+                    color=HH_COLOURS[PRETRAINED_HH], linewidth=2, linestyle="--")
             any_trace = True
 
         if not any_trace:
@@ -152,12 +165,12 @@ def plot_fitness_traces(java_data, py_data):
 
 # ── Plot 2 & 3: Boxplots ─────────────────────────────────────────────────────
 
-def plot_boxplots(java_data, py_data, key, title, ylabel):
+def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
     """
     One figure per domain.
     For each heuristic ID, draw one box per HH side-by-side.
     """
-    all_hh_labels = JAVA_HHS + [PYTHON_HH]
+    all_hh_labels = JAVA_HHS + [PYTHON_HH, PRETRAINED_HH]
     n_hhs = len(all_hh_labels)
 
     for domain in DOMAINS:
@@ -174,6 +187,11 @@ def plot_boxplots(java_data, py_data, key, title, ylabel):
         py_runs = get_python_runs(py_data, domain)
         bd, nh  = collect_per_heuristic(py_runs, key)
         hh_boxes[PYTHON_HH] = bd
+        max_h = max(max_h, nh)
+
+        pre_runs = get_python_runs(pretrained_data, domain)
+        bd, nh   = collect_per_heuristic(pre_runs, key)
+        hh_boxes[PRETRAINED_HH] = bd
         max_h = max(max_h, nh)
 
         if max_h == 0:
@@ -229,15 +247,16 @@ def plot_boxplots(java_data, py_data, key, title, ylabel):
 # ── Entry point ──────────────────────────────────────────────────────────────
 
 def main():
-    java_data = load_json(JAVA_FILE)
-    py_data   = load_json(PYTHON_FILE)
+    java_data       = load_json(JAVA_FILE)
+    py_data         = load_json(PYTHON_FILE)
+    pretrained_data = load_json(PRETRAINED_FILE)
 
     print("=== Fitness Traces ===")
-    plot_fitness_traces(java_data, py_data)
+    plot_fitness_traces(java_data, py_data, pretrained_data)
 
     print("=== Heuristic Call Counts ===")
     plot_boxplots(
-        java_data, py_data,
+        java_data, py_data, pretrained_data,
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
@@ -245,7 +264,7 @@ def main():
 
     print("=== Heuristic Call Times (ms) ===")
     plot_boxplots(
-        java_data, py_data,
+        java_data, py_data, pretrained_data,
         key="heuristic_call_times_ms",
         title="Heuristic total runtime",
         ylabel="Total time (ms)",
