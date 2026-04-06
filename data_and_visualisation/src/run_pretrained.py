@@ -363,7 +363,7 @@ def run_pretrained_all_domains(
             all_results[name].append(res)
             print(f"  [{name:12s}]  best={res.best_value:.4f}  wall={res.wall_time_s:.2f}s")
 
-    # ── Save JSON ─────────────────────────────────────────────────────────────
+    # Save JSON
     payload = {
         name: [asdict(r) for r in runs]
         for name, runs in all_results.items()

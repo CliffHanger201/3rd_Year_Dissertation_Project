@@ -1,13 +1,12 @@
 # ----- Python -----
 __pycache__/
 *.py[cod]
-# .venv/
-# .env
+.venv/
+.env
 
 # ----- Java -----
 target/
 *.class
-*.jar
 *.war
 *.ear
 *.iml
