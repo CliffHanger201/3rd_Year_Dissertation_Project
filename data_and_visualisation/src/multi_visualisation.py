@@ -17,6 +17,7 @@ Plots produced per domain:
 """
 
 import json
+import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
@@ -29,10 +30,9 @@ PRETRAINED_FILE = "results/pretrained_hh_all_domains_results.json"
 DOMAINS     = ["SAT", "VRP", "TSP", "BinPacking"]
 
 JAVA_HHS    = ["AdapHH", "PHunter", "GenHive"]
-PYTHON_HH   = "MyHyperHeuristic"        # display label for the normal Python HH
-PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"  # display label for the pretrained HH
+PYTHON_HH   = "MyHyperHeuristic"
+PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"
 
-# Colours assigned to each HH (consistent across all plots)
 HH_COLOURS  = {
     "AdapHH":           "#e6194b",
     "PHunter":          "#3cb44b",
@@ -40,6 +40,24 @@ HH_COLOURS  = {
     PYTHON_HH:          "#f58231",
     PRETRAINED_HH:      "#911eb4",
 }
+
+SAVE_DIR = "results/plots"
+
+DOMAIN_ALIASES = {
+    "BinPacking": "Bin",
+}
+
+
+# ── Save helper ──────────────────────────────────────────────────────────────
+
+def _savefig(name: str) -> None:
+    """Save the current figure to SAVE_DIR."""
+    # os.makedirs(SAVE_DIR, exist_ok=True)
+    # path = os.path.join(SAVE_DIR, f"{name}.png")
+    # plt.savefig(path, dpi=300, bbox_inches="tight")
+    # print(f"Saved: {path}")
+    print()
+
 
 # ── Data loading helpers ─────────────────────────────────────────────────────
 
@@ -49,19 +67,11 @@ def load_json(path):
 
 
 def get_python_runs(py_data, domain):
-    """
-    Python JSON is keyed by domain name directly.
-    Returns a list of run dicts for that domain.
-    """
     runs = py_data.get(domain, [])
     return [r for r in runs if isinstance(r, dict)]
 
 
 def get_java_runs(java_data, hh_name, domain):
-    """
-    Java JSON is keyed by HH name; each entry is a run dict with a domain_name field.
-    Returns only the runs matching the requested domain.
-    """
     all_hh_runs = java_data.get(hh_name, [])
     return [
         r for r in all_hh_runs
@@ -72,10 +82,6 @@ def get_java_runs(java_data, hh_name, domain):
 # ── Computation helpers ──────────────────────────────────────────────────────
 
 def median_trace(runs):
-    """
-    Compute a step-wise median fitness trace across a list of run dicts.
-    Returns None if no valid traces are found.
-    """
     traces = []
     for r in runs:
         tr = r.get("fitness_trace")
@@ -97,10 +103,6 @@ def median_trace(runs):
 
 
 def collect_per_heuristic(runs, key):
-    """
-    Returns box_data: list of lists, where box_data[h] = [val_run0, val_run1, ...]
-    for heuristic index h.
-    """
     arrays = [r[key] for r in runs if isinstance(r.get(key), list) and r[key]]
     if not arrays:
         return [], 0
@@ -116,13 +118,14 @@ def collect_per_heuristic(runs, key):
 
 # ── Plot 1: Fitness traces ───────────────────────────────────────────────────
 
-def plot_fitness_traces(java_data, py_data, pretrained_data):
+def plot_fitness_traces(java_data, py_data, pretrained_data,
+                        filename_template="{domain}_fitness_{i}"):
     """One figure per domain; median trace per HH overlaid."""
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         fig, ax = plt.subplots(figsize=(11, 6))
         any_trace = False
 
-        # Java HHs
         for hh_name in JAVA_HHS:
             runs  = get_java_runs(java_data, hh_name, domain)
             trace = median_trace(runs)
@@ -132,7 +135,6 @@ def plot_fitness_traces(java_data, py_data, pretrained_data):
                     color=HH_COLOURS[hh_name], linewidth=2)
             any_trace = True
 
-        # Normal Python HH
         py_runs  = get_python_runs(py_data, domain)
         py_trace = median_trace(py_runs)
         if py_trace is not None:
@@ -140,7 +142,6 @@ def plot_fitness_traces(java_data, py_data, pretrained_data):
                     color=HH_COLOURS[PYTHON_HH], linewidth=2, linestyle="--")
             any_trace = True
 
-        # Pretrained Python HH
         pre_runs  = get_python_runs(pretrained_data, domain)
         pre_trace = median_trace(pre_runs)
         if pre_trace is not None:
@@ -160,12 +161,14 @@ def plot_fitness_traces(java_data, py_data, pretrained_data):
         ax.grid(True)
         fig.tight_layout()
         plt.yscale("log")
+        _savefig(filename_template.format(domain=display_domain, i=i))
         plt.show()
 
 
 # ── Plot 2 & 3: Boxplots ─────────────────────────────────────────────────────
 
-def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
+def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
+                  filename_template="{domain}_{key}_{i}"):
     """
     One figure per domain.
     For each heuristic ID, draw one box per HH side-by-side.
@@ -173,8 +176,8 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
     all_hh_labels = JAVA_HHS + [PYTHON_HH, PRETRAINED_HH]
     n_hhs = len(all_hh_labels)
 
-    for domain in DOMAINS:
-        # Gather box_data and n_heuristics for every HH
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         hh_boxes   = {}
         max_h      = 0
 
@@ -198,7 +201,6 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
             print(f"[{key}] No data for domain: {domain}")
             continue
 
-        # Layout: n_hhs boxes per heuristic ID, small gap between groups
         group_width = 0.8
         box_width   = group_width / n_hhs
         offsets     = [(i - (n_hhs - 1) / 2) * box_width for i in range(n_hhs)]
@@ -225,7 +227,6 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
                     patch.set_facecolor(color)
                     patch.set_alpha(0.7)
 
-        # Legend proxies
         legend_handles = [
             plt.Rectangle((0, 0), 1, 1,
                            facecolor=HH_COLOURS[hh], alpha=0.7, label=hh)
@@ -241,6 +242,7 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel):
         ax.grid(True, axis="y")
         fig.tight_layout()
         plt.yscale("log")
+        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
         plt.show()
 
 
@@ -252,7 +254,10 @@ def main():
     pretrained_data = load_json(PRETRAINED_FILE)
 
     print("=== Fitness Traces ===")
-    plot_fitness_traces(java_data, py_data, pretrained_data)
+    plot_fitness_traces(
+        java_data, py_data, pretrained_data,
+        filename_template="{domain}_fitness_{i}",           # → SAT_fitness_1, VRP_fitness_2 ...
+    )
 
     print("=== Heuristic Call Counts ===")
     plot_boxplots(
@@ -260,6 +265,7 @@ def main():
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
+        filename_template="{domain}_usage_{i}",             # → SAT_usage_1, VRP_usage_2 ...
     )
 
     print("=== Heuristic Call Times (ms) ===")
@@ -268,6 +274,7 @@ def main():
         key="heuristic_call_times_ms",
         title="Heuristic total runtime",
         ylabel="Total time (ms)",
+        filename_template="{domain}_runtime_{i}",           # → SAT_runtime_1, VRP_runtime_2 ...
     )
 
 

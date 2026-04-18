@@ -11,10 +11,24 @@ Plots:
 """
 
 import json
+import os
 import matplotlib.pyplot as plt
 
 RESULT_FILE = "results/python_hh_all_domains_results.json"
 DOMAINS = ["SAT", "VRP", "TSP", "BinPacking"]
+SAVE_DIR = "results/plots"
+
+DOMAIN_ALIASES = {
+    "BinPacking": "Bin",
+}
+
+
+def _savefig(name: str) -> None:
+    """Save the current figure to SAVE_DIR, then show it."""
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    path = os.path.join(SAVE_DIR, f"{name}.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    print(f"Saved: {path}")
 
 
 def _safe_len(x):
@@ -36,7 +50,8 @@ def _get_domain_runs(data, name):
     return [r for r in runs if isinstance(r, dict)]
 
 
-def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_median=True):
+def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_median=True,
+                               filename_template="{domain}_fitness_{i}"):
     """
     One figure per domain.
     - Overlays each run's fitness trace (optionally capped).
@@ -44,7 +59,8 @@ def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_med
     """
     any_plotted = False
 
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)  # falls back to domain if no alias
         runs = _get_domain_runs(all_data, domain)
         if not runs:
             continue
@@ -66,7 +82,7 @@ def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_med
         plt.figure(figsize=(10, 6))
 
         # Overlay traces
-        for i, tr in enumerate(overlay_traces):
+        for tr in overlay_traces:
             plt.plot(tr, alpha=0.25)
 
         # Median trace (step-wise), truncated to min length across runs
@@ -101,6 +117,7 @@ def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_med
             plt.legend()
         plt.yscale("log")
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain, i=i))
         plt.show()
 
         any_plotted = True
@@ -133,19 +150,19 @@ def _collect_per_heuristic_box_data(runs, key):
             if isinstance(val, (int, float)):
                 box_data[h].append(val)
 
-    # optional: drop heuristics that have no data at all
-    # (but keep positions consistent if you prefer)
     return box_data, n_heuristics
 
 
-def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str):
+def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str,
+                             filename_template="{domain}_{key}_{i}"):
     """
     key: "heuristic_call_counts" OR "heuristic_call_times_ms"
     Boxplot distribution across runs for each heuristic ID.
     """
     any_plotted = False
 
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)  # falls back to domain if no alias
         runs = _get_domain_runs(all_data, domain)
         if not runs:
             continue
@@ -158,7 +175,6 @@ def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str):
         width = max(10, min(24, 0.6 * n_heuristics))
         plt.figure(figsize=(width, 5))
 
-        # Matplotlib wants a list of lists; positions set to heuristic IDs (0..n-1)
         positions = list(range(n_heuristics))
         plt.boxplot(
             box_data,
@@ -172,6 +188,7 @@ def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str):
         plt.grid(True, axis="y")
         plt.yscale("log")
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
         plt.show()
 
         any_plotted = True
@@ -190,8 +207,9 @@ def main():
     plot_fitness_traces_multi(
         data,
         meta,
-        max_runs_to_overlay=30,   # set None to overlay all
+        max_runs_to_overlay=30,
         show_median=True,
+        filename_template="{domain}_Fitness_{i}",    # → SAT_fitness_log1, VRP_fitness_log2 ...
     )
 
     # 2) Heuristic usage distributions (calls) per domain
@@ -200,6 +218,7 @@ def main():
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
+        filename_template="{domain}_Usage_{i}",         # → SAT_usage_1, VRP_usage_2 ...
     )
 
     # 3) Heuristic runtime distributions (ms) per domain
@@ -208,6 +227,7 @@ def main():
         key="heuristic_call_times_ms",
         title="Heuristic total runtime (ms)",
         ylabel="Total time (ms)",
+        filename_template="{domain}_Runtime_{i}",       # → SAT_runtime_1, VRP_runtime_2 ...
     )
 
 

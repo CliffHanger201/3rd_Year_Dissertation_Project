@@ -30,22 +30,38 @@ import matplotlib.colors as mcolors
 import numpy as np
 
 # ── paths ────────────────────────────────────────────────────────────────────
-NORMAL_FILE    = "results/python_hh_all_domains_results.json"
+NORMAL_FILE     = "results/python_hh_all_domains_results.json"
 PRETRAINED_FILE = "results/pretrained_hh_all_domains_results.json"
 
-QTABLE_DIR     = "qtables"
-QTABLE_PATHS   = {
+QTABLE_DIR  = "qtables"
+QTABLE_PATHS = {
     domain: os.path.join(QTABLE_DIR, f"qtable_{domain}.pkl")
     for domain in ["SAT", "VRP", "TSP", "BinPacking"]
 }
 
 DOMAINS = ["SAT", "VRP", "TSP", "BinPacking"]
 
-# Colour palette — normal=blue family, pretrained=orange family
 COLOUR_NORMAL     = "#4C72B0"
 COLOUR_PRETRAINED = "#DD8452"
-ALPHA_TRACE       = 0.18   # individual run opacity
+ALPHA_TRACE       = 0.18
 ALPHA_MEDIAN      = 1.0
+
+SAVE_DIR = "results/plots"
+
+DOMAIN_ALIASES = {
+    "BinPacking": "Bin",
+}
+
+
+# ── Save helper ───────────────────────────────────────────────────────────────
+
+def _savefig(name: str) -> None:
+    """Save the current figure to SAVE_DIR."""
+    # os.makedirs(SAVE_DIR, exist_ok=True)
+    # path = os.path.join(SAVE_DIR, f"{name}.png")
+    # plt.savefig(path, dpi=300, bbox_inches="tight")
+    # print(f"Saved: {path}")
+    print()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -58,7 +74,6 @@ def _load_json(path: str) -> dict:
 
 
 def _load_qtable_pkl(path: str) -> dict:
-    """Return the raw pickle dict (keys: h_count, state_bins, lr, gamma, table)."""
     with open(path, "rb") as f:
         return pickle.load(f)
 
@@ -71,7 +86,6 @@ def _get_domain_runs(data: dict, name: str) -> list:
 
 
 def _median_trace(traces: list) -> list:
-    """Step-wise median, truncated to the shortest trace."""
     if len(traces) < 2:
         return traces[0] if traces else []
     min_len = min(len(t) for t in traces)
@@ -87,10 +101,6 @@ def _median_trace(traces: list) -> list:
 
 
 def _collect_box_data(runs: list, key: str):
-    """
-    Returns (box_data, n_heuristics).
-    box_data[h] = list of values across runs for heuristic h.
-    """
     arrays = [r.get(key) for r in runs if isinstance(r.get(key), list) and r.get(key)]
     if not arrays:
         return [], 0
@@ -107,36 +117,10 @@ def _collect_box_data(runs: list, key: str):
 # §1  Q-Table heatmaps
 # ═════════════════════════════════════════════════════════════════════════════
 
-def _build_heatmap_matrix(table: dict, h_count: int):
-    """
-    Convert sparse {state_key: np.ndarray} → 2-D numpy array.
-
-    Rows  = state keys, sorted lexicographically for reproducibility.
-    Cols  = heuristic IDs (0 … h_count-1).
-
-    Returns (matrix, row_labels).
-    """
-    keys = sorted(table.keys())
-    if not keys:
-        return np.zeros((1, h_count)), ["(empty)"]
-
-    matrix = np.vstack([table[k] for k in keys])   # shape: (n_states, h_count)
-
-    # Truncate / pad columns to h_count just in case
-    if matrix.shape[1] < h_count:
-        pad = np.zeros((matrix.shape[0], h_count - matrix.shape[1]))
-        matrix = np.hstack([matrix, pad])
-    elif matrix.shape[1] > h_count:
-        matrix = matrix[:, :h_count]
-
-    # Human-readable row labels: "(b0, b1, …)"
-    row_labels = [str(k) for k in keys]
-    return matrix.astype(float), row_labels
-
-
-def plot_qtable_heatmaps():
+def plot_qtable_heatmaps(filename_template="{domain}_qtable_{i}"):
     """§1 — One heatmap per domain for the pretrained Q-table."""
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         pkl = _load_qtable_pkl(QTABLE_PATHS[domain])
         table   = pkl["table"]
         h_count = pkl["h_count"]
@@ -144,9 +128,8 @@ def plot_qtable_heatmaps():
         if not table:
             continue
 
-        matrix = np.vstack(list(table.values()))  # (n_states, h_count)
+        matrix = np.vstack(list(table.values()))
 
-        # Summarise into 3 rows instead of hundreds
         summary = np.vstack([
             matrix.mean(axis=0),
             matrix.max(axis=0),
@@ -166,12 +149,12 @@ def plot_qtable_heatmaps():
         ax.set_title(f"{domain} — Q-Table summary ({len(table)} states visited)",
                      fontweight="bold")
 
-        # Annotate each cell
         for r in range(3):
             for c in range(h_count):
                 ax.text(c, r, f"{summary[r,c]:.3f}", ha="center", va="center", fontsize=8)
 
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain, i=i))
         plt.show()
 
 
@@ -180,15 +163,17 @@ def plot_qtable_heatmaps():
 # ═════════════════════════════════════════════════════════════════════════════
 
 def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
-                                   max_overlay: int = 30):
+                                   max_overlay: int = 30,
+                                   filename_template="{domain}_fitness_{i}"):
     """
     One figure per domain.
-    Blue  = normal HH runs + bold median.
+    Blue   = normal HH runs + bold median.
     Orange = pretrained HH runs + bold median.
     """
     any_plotted = False
 
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         norm_runs = _get_domain_runs(normal_data,     domain)
         pre_runs  = _get_domain_runs(pretrained_data, domain)
 
@@ -202,13 +187,11 @@ def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
 
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # ── overlay individual runs ──────────────────────────────────────────
         for tr in norm_traces[:max_overlay]:
             ax.plot(tr, color=COLOUR_NORMAL,     alpha=ALPHA_TRACE, linewidth=0.8)
         for tr in pre_traces[:max_overlay]:
             ax.plot(tr, color=COLOUR_PRETRAINED, alpha=ALPHA_TRACE, linewidth=0.8)
 
-        # ── median traces ────────────────────────────────────────────────────
         if len(norm_traces) >= 2:
             ax.plot(_median_trace(norm_traces),
                     color=COLOUR_NORMAL, linewidth=2.5,
@@ -235,6 +218,7 @@ def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=10)
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain, i=i))
         plt.show()
         any_plotted = True
 
@@ -247,7 +231,8 @@ def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
 # ═════════════════════════════════════════════════════════════════════════════
 
 def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
-                                       key: str, title: str, ylabel: str):
+                                       key: str, title: str, ylabel: str,
+                                       filename_template="{domain}_{key}_{i}"):
     """
     Side-by-side boxplots per heuristic ID.
     Left  (blue)   = normal HH.
@@ -255,7 +240,8 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
     """
     any_plotted = False
 
-    for domain in DOMAINS:
+    for i, domain in enumerate(DOMAINS, start=1):
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         norm_runs = _get_domain_runs(normal_data,     domain)
         pre_runs  = _get_domain_runs(pretrained_data, domain)
 
@@ -269,15 +255,13 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
         width = max(10, min(28, 0.9 * n_heuristics))
         fig, ax = plt.subplots(figsize=(width, 5))
 
-        # ── pad shorter array with empty lists so indices align ──────────────
         while len(norm_box) < n_heuristics:
             norm_box.append([])
         while len(pre_box)  < n_heuristics:
             pre_box.append([])
 
-        offset = 0.22   # half-gap between the two boxplots per heuristic
+        offset = 0.22
 
-        # Filter out heuristics with no data for cleaner plots
         def _valid(lst):
             return [v for v in lst if isinstance(v, (int, float))]
 
@@ -287,7 +271,7 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
         positions_norm = [h - offset for h in range(n_heuristics)]
         positions_pre  = [h + offset for h in range(n_heuristics)]
 
-        bp_norm = ax.boxplot(
+        ax.boxplot(
             norm_data_clean,
             positions=positions_norm,
             widths=0.35,
@@ -301,7 +285,7 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
                             markerfacecolor=COLOUR_NORMAL, alpha=0.4, markersize=4),
         )
 
-        bp_pre = ax.boxplot(
+        ax.boxplot(
             pre_data_clean,
             positions=positions_pre,
             widths=0.35,
@@ -315,7 +299,6 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
                             markerfacecolor=COLOUR_PRETRAINED, alpha=0.4, markersize=4),
         )
 
-        # Legend proxy patches
         from matplotlib.patches import Patch
         legend_elements = [
             Patch(facecolor=COLOUR_NORMAL,     alpha=0.8, label="Normal HH"),
@@ -332,6 +315,7 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
         ax.set_title(f"{domain} — {title}: Normal vs Pretrained",
                      fontsize=13, fontweight="bold")
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
         plt.show()
         any_plotted = True
 
@@ -344,39 +328,39 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
 # ═════════════════════════════════════════════════════════════════════════════
 
 def main():
-    # ── load results ─────────────────────────────────────────────────────────
     print("Loading result files …")
     normal_data     = _load_json(NORMAL_FILE)
     pretrained_data = _load_json(PRETRAINED_FILE)
 
-    # ── §1  Q-Table heatmaps (pretrained) ────────────────────────────────────
     print("\n§1  Plotting Q-Table heatmaps …")
-    plot_qtable_heatmaps()
+    plot_qtable_heatmaps(
+        filename_template="{domain}_qtable_{i}",            # → SAT_qtable_1, Bin_qtable_4 ...
+    )
 
-    # ── §2  Fitness traces ────────────────────────────────────────────────────
     print("\n§2  Plotting fitness traces …")
     plot_fitness_traces_comparison(
         normal_data,
         pretrained_data,
         max_overlay=30,
+        filename_template="{domain}_fitness_{i}",           # → SAT_fitness_1, Bin_fitness_4 ...
     )
 
-    # ── §3  Heuristic call counts ─────────────────────────────────────────────
     print("\n§3  Plotting heuristic call-count distributions …")
     plot_heuristic_boxplots_comparison(
         normal_data, pretrained_data,
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
+        filename_template="{domain}_usage_{i}",             # → SAT_usage_1, Bin_usage_4 ...
     )
 
-    # ── §4  Heuristic runtimes ────────────────────────────────────────────────
     print("\n§4  Plotting heuristic runtime distributions …")
     plot_heuristic_boxplots_comparison(
         normal_data, pretrained_data,
         key="heuristic_call_times_ms",
         title="Heuristic total runtime (ms)",
         ylabel="Total time (ms)",
+        filename_template="{domain}_runtime_{i}",           # → SAT_runtime_1, Bin_runtime_4 ...
     )
 
 

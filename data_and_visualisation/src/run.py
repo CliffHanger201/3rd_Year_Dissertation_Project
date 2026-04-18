@@ -1,3 +1,9 @@
+"""
+run.py
+
+Runs the hyper-heuristic on all 4 domains 
+"""
+
 import json
 import time
 from dataclasses import dataclass, asdict
@@ -146,7 +152,7 @@ def run_hyflex_domain(
 
 def run_hyflex_all_domains(
     n_runs: int = 30,
-    seed: int = 42,
+    base_seed: int = 42,
     time_limit_ms: int = 30000,
     instances: Optional[Dict[str, int]] = None,
     memory_size: int = 2,
@@ -170,7 +176,7 @@ def run_hyflex_all_domains(
     all_results: DefaultDict[str, List[DomainRunResult]] = defaultdict(list)
 
     for run_id in range(n_runs):
-        seed = seed + run_id
+        seed = base_seed + run_id
         print(f"\n==============================")
         print(f"RUN {run_id+1}/{n_runs} (seed={seed})")
         print(f"==============================\n")
@@ -217,7 +223,7 @@ if __name__ == "__main__":
     # Pick per-domain instance IDs as needed.
     run_hyflex_all_domains(
         n_runs=30,
-        seed=42,
+        base_seed=42,
         time_limit_ms=120000,
         instances={
             "SAT": 0,

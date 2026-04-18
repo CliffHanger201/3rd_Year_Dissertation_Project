@@ -131,7 +131,7 @@ def run_java_hh_all_domains(
     hh_names=("AdapHH", "PHunter", "GenHive"),
     domains=("SAT", "VRP", "BinPacking", "TSP"),
     n_runs=30,
-    seed=42,
+    base_seed=42,
     time_limit_ms=30000,
     instances=None,
     memory_size=2,
@@ -147,7 +147,7 @@ def run_java_hh_all_domains(
     all_results: defaultdict = defaultdict(list)
 
     for run_id in range(n_runs):
-        seed = seed + run_id
+        seed = base_seed + run_id
         print(f"\n==============================")
         print(f"RUN {run_id+1}/{n_runs} (seed={seed})")
         print(f"==============================\n")
@@ -203,7 +203,7 @@ if __name__ == "__main__":
         hh_names=("AdapHH", "PHunter", "GenHive"),
         domains=("SAT", "VRP", "BinPacking", "TSP"),
         n_runs=30,
-        seed=42,
+        base_seed=42,
         time_limit_ms=30000,
         instances=None,
         memory_size=2,

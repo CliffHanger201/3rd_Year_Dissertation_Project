@@ -273,7 +273,7 @@ def run_one_eval(
 
 def run_pretrained_all_domains(
     n_runs:             int                 = 30,
-    seed:               int                 = 42,
+    base_seed:          int                 = 42,
     time_limit_ms:      int                 = 30000,
     pretrain_time_ms:   int                 = 30000,
     n_pretrain_runs:    int                 = 5,
@@ -326,7 +326,7 @@ def run_pretrained_all_domains(
             domain_cls=cls,
             domain_name=name,
             train_instance_ids=train_instance_ids,
-            seed=seed,
+            seed=base_seed,
             memory_size=memory_size,
             init_indices=init_indices,
             pretrain_time_ms=pretrain_time_ms,
@@ -344,7 +344,7 @@ def run_pretrained_all_domains(
     print("=" * 60)
 
     for run_id in range(n_runs):
-        seed = seed + run_id      # Revert back into base_seed later
+        seed = base_seed + run_id      # Revert back into base_seed later
         print(f"\n── Run {run_id + 1}/{n_runs}  (seed={seed}) ──")      # Revert back into base_seed later
 
         for name, cls in domain_specs:
@@ -370,7 +370,7 @@ def run_pretrained_all_domains(
     }
     payload["_meta"] = {
         "n_runs":             n_runs,
-        "base_seed":          seed,         # Revert back into base_seed later
+        "base_seed":          base_seed,         # Revert back into base_seed later
         "time_limit_ms":      time_limit_ms,
         "pretrain_time_ms":   pretrain_time_ms,
         "n_pretrain_runs":    n_pretrain_runs,
@@ -395,7 +395,7 @@ def run_pretrained_all_domains(
 if __name__ == "__main__":
     run_pretrained_all_domains(
         n_runs=30,
-        seed=42,
+        base_seed=42,
         time_limit_ms=120000,
         pretrain_time_ms=120000,          # budget per training instance during collection
         n_pretrain_runs=5,              # ← 5 runs × 4 instances = 20 total pre-training runs
