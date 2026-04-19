@@ -126,7 +126,7 @@ def pretrain_domain(
     use_surrogate:      bool           = False,
     qtable_save_path:   Optional[str]  = None,
     config:             Optional[HHConfig] = None,
-    test_instance:      int            = 0,        # ← NEW: for guard check
+    test_instance:      int            = 0,
 ) -> PreTrainedHH:
     """
     Build training problem instances and run offline collection n_pretrain_runs

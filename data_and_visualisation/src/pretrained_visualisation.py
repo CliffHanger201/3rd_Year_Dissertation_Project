@@ -57,12 +57,10 @@ DOMAIN_ALIASES = {
 
 def _savefig(name: str) -> None:
     """Save the current figure to SAVE_DIR."""
-    # os.makedirs(SAVE_DIR, exist_ok=True)
-    # path = os.path.join(SAVE_DIR, f"{name}.png")
-    # plt.savefig(path, dpi=300, bbox_inches="tight")
-    # print(f"Saved: {path}")
-    print()
-
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    path = os.path.join(SAVE_DIR, f"{name}.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    print(f"Saved: {path}")
 
 # ═════════════════════════════════════════════════════════════════════════════
 # Helpers
@@ -154,7 +152,7 @@ def plot_qtable_heatmaps(filename_template="{domain}_qtable_{i}"):
                 ax.text(c, r, f"{summary[r,c]:.3f}", ha="center", va="center", fontsize=8)
 
         plt.tight_layout()
-        _savefig(filename_template.format(domain=display_domain, i=i))
+        _savefig(filename_template.format(domain=display_domain, i=1))
         plt.show()
 
 
@@ -218,7 +216,7 @@ def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
         ax.grid(True, which="both", alpha=0.3)
         ax.legend(fontsize=10)
         plt.tight_layout()
-        _savefig(filename_template.format(domain=display_domain, i=i))
+        _savefig(filename_template.format(domain=display_domain, i=1))
         plt.show()
         any_plotted = True
 
@@ -315,7 +313,7 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
         ax.set_title(f"{domain} — {title}: Normal vs Pretrained",
                      fontsize=13, fontweight="bold")
         plt.tight_layout()
-        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
+        _savefig(filename_template.format(domain=display_domain, key=key, i=1))
         plt.show()
         any_plotted = True
 
@@ -342,7 +340,7 @@ def main():
         normal_data,
         pretrained_data,
         max_overlay=30,
-        filename_template="{domain}_fitness_{i}",           # → SAT_fitness_1, Bin_fitness_4 ...
+        filename_template="{domain}_fitness_pretrain_{i}",           # → SAT_fitness_1, Bin_fitness_4 ...
     )
 
     print("\n§3  Plotting heuristic call-count distributions …")
@@ -351,7 +349,7 @@ def main():
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
-        filename_template="{domain}_usage_{i}",             # → SAT_usage_1, Bin_usage_4 ...
+        filename_template="{domain}_usage_pretrain_{i}",             # → SAT_usage_1, Bin_usage_4 ...
     )
 
     print("\n§4  Plotting heuristic runtime distributions …")
@@ -360,7 +358,7 @@ def main():
         key="heuristic_call_times_ms",
         title="Heuristic total runtime (ms)",
         ylabel="Total time (ms)",
-        filename_template="{domain}_runtime_{i}",           # → SAT_runtime_1, Bin_runtime_4 ...
+        filename_template="{domain}_runtime_pretrain_{i}",           # → SAT_runtime_1, Bin_runtime_4 ...
     )
 
 

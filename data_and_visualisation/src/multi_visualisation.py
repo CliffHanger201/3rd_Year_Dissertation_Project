@@ -52,10 +52,10 @@ DOMAIN_ALIASES = {
 
 def _savefig(name: str) -> None:
     """Save the current figure to SAVE_DIR."""
-    # os.makedirs(SAVE_DIR, exist_ok=True)
-    # path = os.path.join(SAVE_DIR, f"{name}.png")
-    # plt.savefig(path, dpi=300, bbox_inches="tight")
-    # print(f"Saved: {path}")
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    path = os.path.join(SAVE_DIR, f"{name}.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    print(f"Saved: {path}")
     print()
 
 
@@ -119,7 +119,7 @@ def collect_per_heuristic(runs, key):
 # ── Plot 1: Fitness traces ───────────────────────────────────────────────────
 
 def plot_fitness_traces(java_data, py_data, pretrained_data,
-                        filename_template="{domain}_fitness_{i}"):
+                        filename_template="{domain}_fitness_multi_{i}"):
     """One figure per domain; median trace per HH overlaid."""
     for i, domain in enumerate(DOMAINS, start=1):
         display_domain = DOMAIN_ALIASES.get(domain, domain)
@@ -161,14 +161,14 @@ def plot_fitness_traces(java_data, py_data, pretrained_data,
         ax.grid(True)
         fig.tight_layout()
         plt.yscale("log")
-        _savefig(filename_template.format(domain=display_domain, i=i))
+        _savefig(filename_template.format(domain=display_domain, i=1))
         plt.show()
 
 
 # ── Plot 2 & 3: Boxplots ─────────────────────────────────────────────────────
 
 def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
-                  filename_template="{domain}_{key}_{i}"):
+                  filename_template="{domain}_{key}_multi_{i}"):
     """
     One figure per domain.
     For each heuristic ID, draw one box per HH side-by-side.
@@ -242,11 +242,11 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
         ax.grid(True, axis="y")
         fig.tight_layout()
         plt.yscale("log")
-        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
+        _savefig(filename_template.format(domain=display_domain, key=key, i=1))
         plt.show()
 
 
-# ── Entry point ──────────────────────────────────────────────────────────────
+# --------------- Entry point ------------------
 
 def main():
     java_data       = load_json(JAVA_FILE)
@@ -256,7 +256,7 @@ def main():
     print("=== Fitness Traces ===")
     plot_fitness_traces(
         java_data, py_data, pretrained_data,
-        filename_template="{domain}_fitness_{i}",           # → SAT_fitness_1, VRP_fitness_2 ...
+        filename_template="{domain}_fitness_multi_{i}",
     )
 
     print("=== Heuristic Call Counts ===")
@@ -265,7 +265,7 @@ def main():
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
-        filename_template="{domain}_usage_{i}",             # → SAT_usage_1, VRP_usage_2 ...
+        filename_template="{domain}_usage_multi_{i}",
     )
 
     print("=== Heuristic Call Times (ms) ===")
@@ -274,7 +274,7 @@ def main():
         key="heuristic_call_times_ms",
         title="Heuristic total runtime",
         ylabel="Total time (ms)",
-        filename_template="{domain}_runtime_{i}",           # → SAT_runtime_1, VRP_runtime_2 ...
+        filename_template="{domain}_runtime_multi_{i}",
     )
 
 
