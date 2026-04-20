@@ -1,15 +1,15 @@
 """
-visualise_single_instance.py
+extension_visualisation.py
 =============================
 Visualisation for single-instance pre-training results.
 
 Sections
 --------
-  §1  Fitness convergence   — 4 panels per domain
+  §1  Fitness convergence — 4 panels per domain
         Pre-training (instance 1) + test instances 1.2, 1.3, 1.4.
         Directly shows whether the frozen policy converges on unseen instances.
 
-  §2  Q-Table heatmaps      — per domain, 2 rows × 4 columns
+  §2  Q-Table heatmaps — per domain, 2 rows × 4 columns:
         Row 1: actual Q-values (mean / max / min) loaded from pkl files.
                 Train pkl and eval pkls are loaded separately.
                 Eval Q-values are identical to training (freeze confirmed).
@@ -84,6 +84,19 @@ LABEL_DISPLAY = {
     "1.4":   "Test 1.4 (Instance 4)",
 }
 
+SAVE_DIR = "results/plots/extension"
+
+DOMAIN_ALIASES = {
+    "BinPacking": "Bin",
+}
+
+# Save helper
+def _savefig(name: str) -> None:
+    """Save the current figure to SAVE_DIR."""
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    path = os.path.join(SAVE_DIR, f"{name}.png")
+    plt.savefig(path, dpi=300, bbox_inches="tight")
+    print(f"Saved: {path}")
 
 # =============================================================================
 # Data helpers
@@ -254,7 +267,7 @@ def _draw_heatmap(
 # §1  Fitness convergence — 4 panels per domain
 # =============================================================================
 
-def plot_fitness_traces(data: dict) -> None:
+def plot_fitness_traces(data: dict, filename_template="{domain}_ext_fitness") -> None:
     """
     §1 — One figure per domain, four panels:
       [Test 1.2] [Test 1.3] [Test 1.4]
@@ -275,6 +288,7 @@ def plot_fitness_traces(data: dict) -> None:
     })
 
     for domain in DOMAINS:
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         pretrain_runs = _get_pretrain_runs(data, domain)
         eval_runs     = _get_runs(data, domain)
 
@@ -333,6 +347,7 @@ def plot_fitness_traces(data: dict) -> None:
                 ax.set_ylabel("Objective value (log scale)", fontsize=9)
 
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain))
         plt.show()
 
 
@@ -340,7 +355,7 @@ def plot_fitness_traces(data: dict) -> None:
 # §2  Q-Table heatmaps — 2 rows × 4 columns per domain
 # =============================================================================
 
-def plot_qtable_heatmaps(data: dict) -> None:
+def plot_qtable_heatmaps(data: dict, filename_template="{domain}_ext_qtable") -> None:
     """
     §2 — One figure per domain.  Layout: 2 rows × (1 + n_test_labels) columns.
 
@@ -370,6 +385,7 @@ def plot_qtable_heatmaps(data: dict) -> None:
     ncols     = len(all_cols)
 
     for domain in DOMAINS:
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         eval_runs = _get_runs(data, domain)
 
         fig, axes = plt.subplots(
@@ -440,7 +456,7 @@ def plot_qtable_heatmaps(data: dict) -> None:
                 vmax2 = float(summary2.max()) or 1.0
                 _draw_heatmap(
                     ax_u, summary2, h_count,
-                    cmap="YlOrBr", vmin=0, vmax=vmax2,
+                    cmap="YlOrRd", vmin=0, vmax=vmax2,
                     cb_label="Usage fraction",
                     row_labels=["Mean", "Max", "Min"],
                 )
@@ -454,6 +470,7 @@ def plot_qtable_heatmaps(data: dict) -> None:
 
         plt.tight_layout(rect=[0.015, 0, 1, 1.01])
         plt.subplots_adjust(wspace=0.5)
+        _savefig(filename_template.format(domain=display_domain))
         plt.show()
 
 
@@ -461,7 +478,7 @@ def plot_qtable_heatmaps(data: dict) -> None:
 # §3  Q-Table state breadth — bar chart per domain
 # =============================================================================
 
-def plot_qtable_state_counts(data: dict) -> None:
+def plot_qtable_state_counts(data: dict, filename_template="qtable_state_breadth") -> None:
     """
     §3 — Q-Table state breadth shown as a frequency heatmap.
     Rows = labels (train + test instances).
@@ -479,8 +496,8 @@ def plot_qtable_state_counts(data: dict) -> None:
     all_rows = ["train"] + all_labels
 
     fig, axes = plt.subplots(
-        2, 2,                                    # ← was (1, len(DOMAINS))
-        figsize=(8, 6),                         # ← was (len(DOMAINS) * 4.5, 3.5)
+        2, 2,
+        figsize=(8, 6),
         squeeze=False,
     )
 
@@ -553,6 +570,7 @@ def plot_qtable_state_counts(data: dict) -> None:
         ax.set_title(domain, fontsize=10, fontweight="bold")
 
     plt.tight_layout(rect=[0, 0, 1, 1])
+    _savefig(filename_template.format())
     plt.show()
 
 
@@ -560,7 +578,7 @@ def plot_qtable_state_counts(data: dict) -> None:
 # §4  Heuristic usage trends across repeats — 4 panels per domain
 # =============================================================================
 
-def plot_heuristic_usage_trends(data: dict) -> None:
+def plot_heuristic_usage_trends(data: dict, filename_template="{domain}_heuristic_usage_trends") -> None:
     """
     §4 — One figure per domain, four panels (train + 3 test instances).
 
@@ -588,9 +606,10 @@ def plot_heuristic_usage_trends(data: dict) -> None:
         for r in _get_runs(data, domain)
         if r.get("qtable_label")
     })
-    all_panels = ["train"] + all_labels
+    all_panels = all_labels
 
     for domain in DOMAINS:
+        display_domain = DOMAIN_ALIASES.get(domain, domain)
         pretrain_runs = _get_pretrain_runs(data, domain)
         eval_runs     = _get_runs(data, domain)
 
@@ -663,13 +682,6 @@ def plot_heuristic_usage_trends(data: dict) -> None:
                     z = np.polyfit(x_vals, y, 1)
                     ax.plot(x_vals, np.poly1d(z)(x_vals),
                             color=col, linewidth=0.8, linestyle="--", alpha=0.55)
-                # Annotate mean at far right
-                ax.annotate(
-                    f"{y.mean():.0f}",
-                    xy=(x_vals[-1], y[-1]),
-                    xytext=(4, 0), textcoords="offset points",
-                    fontsize=6, color=col, va="center",
-                )
 
             ax.set_title(title, fontsize=10, fontweight="bold", color=colour)
             ax.set_xlabel(
@@ -683,6 +695,7 @@ def plot_heuristic_usage_trends(data: dict) -> None:
                       loc="upper right", framealpha=0.7)
 
         plt.tight_layout()
+        _savefig(filename_template.format(domain=display_domain))
         plt.show()
 
 
@@ -690,7 +703,7 @@ def plot_heuristic_usage_trends(data: dict) -> None:
 # §5  Final best-value distributions — strip chart per domain
 # =============================================================================
 
-def plot_final_value_distributions(data: dict) -> None:
+def plot_final_value_distributions(data: dict, filename_template="domain_best_strip_chart") -> None:
     """
     §5 — Strip chart of final best_value per repeat, grouped by Q-Table label.
     One panel per domain.  Lower = better (minimisation).
@@ -752,6 +765,7 @@ def plot_final_value_distributions(data: dict) -> None:
         )
 
     plt.tight_layout()
+    _savefig(filename_template.format())
     plt.show()
 
 
@@ -759,7 +773,7 @@ def plot_final_value_distributions(data: dict) -> None:
 # §6  Improvement ratio — strip chart per domain
 # =============================================================================
 
-def plot_improvement_ratio(data: dict) -> None:
+def plot_improvement_ratio(data: dict, filename_template="domain_improvement_strip_chart") -> None:
     """
     §6 — Strip chart of improvement ratio per test instance, one panel per domain.
     improvement_ratio = (initial_value − best_value) / |initial_value|
@@ -815,6 +829,7 @@ def plot_improvement_ratio(data: dict) -> None:
         ax.grid(True, axis="y", alpha=0.3)
 
     plt.tight_layout()
+    _savefig(filename_template.format())
     plt.show()
 
 

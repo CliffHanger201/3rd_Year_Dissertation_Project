@@ -639,8 +639,8 @@ class BinPacking(ProblemDomain):
             else:
                 raise ValueError(f"Heuristic {heuristicID} does not exist")
 
-            self.heuristicCallRecord[heuristicID] += 1
-            self.heuristicCallTimeRecord[heuristicID] += int((time.time() - start) * 1000)
+        self.heuristicCallRecord[heuristicID] += 1
+        self.heuristicCallTimeRecord[heuristicID] += int((time.time() - start) * 1000)
 
         self.sortbins(temp1, self.HIGHEST_FIRST)
         self.sanitycheck(temp1)

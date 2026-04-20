@@ -56,7 +56,6 @@ def _savefig(name: str) -> None:
     path = os.path.join(SAVE_DIR, f"{name}.png")
     plt.savefig(path, dpi=300, bbox_inches="tight")
     print(f"Saved: {path}")
-    print()
 
 
 # ── Data loading helpers ─────────────────────────────────────────────────────

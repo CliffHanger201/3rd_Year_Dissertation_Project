@@ -619,7 +619,7 @@ def run_single_instance_pretrain_all_domains(
                 )
                 all_results[name].append(res)
                 print(
-                    f"  [{name:12s}]  label={res.qtable_label}  "
+                    f"  [{name}]  label={res.qtable_label}  "
                     f"best={res.best_value:.4f}  "
                     f"impr={res.improvement_ratio:.3f}  "
                     f"wall={res.wall_time_s:.2f}s"
