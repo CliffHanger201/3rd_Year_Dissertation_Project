@@ -69,7 +69,7 @@ https://github.com/seage/hyflex
 ### 1. Base Hyper-Heuristic Run
 
 Run: 
-```
+```bash
 python -m data_and_visualisation.src.run
 ```
 
