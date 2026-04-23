@@ -1,5 +1,5 @@
 """
-python_hyper_heuristic.src.hyperheuristic_advanced
+python_hyper_heuristic.src.hyperheuristic.py
 
 An advanced HyFlex-style hyper-heuristic (HH) based on an extended Choice Function
 with adaptive move acceptance, phases, and robust statistics.
@@ -20,59 +20,6 @@ This HH does not require those, but you can wire them in easily.
 Notes:
 - Minimisation is assumed (smaller fitness is better), matching HyFlex.
 - Uses CPU-time via time.process_time_ns() like classic HyFlex code.
-
-Changes from the original (unoptimised) version
-------------------------------------------------
-OPT 1  TABU SET      self._tabu_set kept in sync with self.tabu (deque) so
-                     _select_heuristic never rebuilds set(self.tabu) per call.
-                     self.tabu is preserved for external access (e.g. PreTrainedHH).
-                     _update_tabu now guards duplicate-entry eviction correctly.
-
-OPT 2  LOG1P TABLE   math.log1p(recency) in the CF inner loop replaced with a
-                     pre-built integer lookup table (_fast_log1p).
-
-OPT 3  SHAPED TABLE  math.log1p + math.copysign in _credit_assignment replaced
-                     with a pre-built lookup table (_fast_shaped).
-
-OPT 4  INDEX SWAP    Instead of copySolution(CURRENT, CANDIDATE) on every
-                     rejected move, we maintain cur_idx / cand_idx pointers and
-                     swap them on acceptance.  Rejection costs zero copies.
-
-OPT 5  CROSSOVER     has_crossover boolean hoisted before the loop; rng.randrange
-GUARD               is only called when crossover heuristics actually exist.
-
-OPT 6  BEST-FIT      try/except around getBestSolutionValue() probed once before
-PROBE               the loop; hot path becomes a plain `if` with no exception
-                     machinery.
-
-BUG FIX 1  LAHC BUFFER POISONING
-           LateAcceptanceHillClimbing now overrides on_stall() to pessimise its
-           buffer to the worst stored value.  Without this, every post-restart
-           move was rejected because the buffer still held pre-restart fitnesses.
-           acceptance.reset() is also called after every restart in _solve.
-
-BUG FIX 2  TABU DUPLICATE EVICTION
-           _update_tabu previously called _tabu_set.discard(evicted) even when
-           the same heuristic appeared multiple times in the deque.  Now it only
-           discards from the set when no further occurrences remain in the deque.
-
-BUG FIX 3  ALL-TABU FALLBACK
-           _select_heuristic initialises best_h = -1 and falls back to an
-           unconstrained scan when every heuristic is tabu, instead of silently
-           returning H0 every time.
-
-New features (beyond the original)
------------------------------------
-- tighten() hook on all acceptance classes (called late in search to narrow
-  acceptance of worsening moves as the time budget runs out).
-- restart_count and total_improves counters exposed on the instance.
-- best_fitness is reset to current_fit after each restart so the stall counter
-  cannot immediately re-fire.
-- Pool reseed is done after acceptance.reset() to ensure consistent state.
-- _apply_heuristic helper retained (crossover vs unary dispatch).
-- Phase-weight shaping uses local variable cache to avoid repeated cfg lookups.
-- _credit_assignment caches smoothing constants as locals.
-- All docstrings and intent comments from the original are preserved.
 """
 
 from __future__ import annotations
@@ -131,14 +78,6 @@ class Phase(Enum):
     DIVERSIFY = auto()
 
 
-class AcceptanceKind(Enum):
-    """Move acceptance strategy."""
-    IMPROVE_OR_EQUAL    = auto()
-    SIMULATED_ANNEALING = auto()
-    LATE_ACCEPTANCE     = auto()
-    GREAT_DELUGE        = auto()
-
-
 # ===========================================================================
 # Configuration
 # ===========================================================================
@@ -173,20 +112,20 @@ class HHConfig:
     tighten_threshold: float = 0.85
     tighten_rate:      float = 0.002   # passed to acceptance.tighten() per iter
 
-    # ---- Acceptance configuration ----
-    acceptance_kind: AcceptanceKind = AcceptanceKind.LATE_ACCEPTANCE
+    # # ---- Acceptance configuration ----
+    # acceptance_kind: AcceptanceKind = AcceptanceKind.LATE_ACCEPTANCE
 
-    # SA parameters (if used)
-    sa_t0:                float = 1.0
-    sa_alpha:             float = 0.995   # cooling rate
-    sa_reheat_multiplier: float = 1.5     # when stuck, increase T
+    # # SA parameters (if used)
+    # sa_t0:                float = 1.0
+    # sa_alpha:             float = 0.995   # cooling rate
+    # sa_reheat_multiplier: float = 1.5     # when stuck, increase T
 
     # LAHC parameters (if used)
     lahc_length: int = 50
 
-    # Great Deluge parameters (if used)
-    gd_initial_slack: float = 0.01
-    gd_decay:         float = 0.999
+    # # Great Deluge parameters (if used)
+    # gd_initial_slack: float = 0.01
+    # gd_decay:         float = 0.999
 
     # ---- Misc ----
     consider_equal_as_accept: bool = True
@@ -251,54 +190,54 @@ class MoveAcceptance:
         pass
 
 
-class ImproveOrEqualAcceptance(MoveAcceptance):
-    def __init__(self, allow_equal: bool = True):
-        self.allow_equal = allow_equal
+# class ImproveOrEqualAcceptance(MoveAcceptance):
+#     def __init__(self, allow_equal: bool = True):
+#         self.allow_equal = allow_equal
 
-    def accept(self, before: float, after: float, iteration: int,
-               rng: random.Random) -> bool:
-        if after < before:
-            return True
-        if self.allow_equal and after == before:
-            return True
-        return False
+#     def accept(self, before: float, after: float, iteration: int,
+#                rng: random.Random) -> bool:
+#         if after < before:
+#             return True
+#         if self.allow_equal and after == before:
+#             return True
+#         return False
 
 
-class SimulatedAnnealingAcceptance(MoveAcceptance):
-    def __init__(self, t0: float, cooling: float, reheat_multiplier: float,
-                 allow_equal: bool = True):
-        self.t0                  = t0
-        self.cooling             = cooling
-        self.reheat_multiplier   = reheat_multiplier
-        self.allow_equal         = allow_equal
-        self.t                   = t0
+# class SimulatedAnnealingAcceptance(MoveAcceptance):
+#     def __init__(self, t0: float, cooling: float, reheat_multiplier: float,
+#                  allow_equal: bool = True):
+#         self.t0                  = t0
+#         self.cooling             = cooling
+#         self.reheat_multiplier   = reheat_multiplier
+#         self.allow_equal         = allow_equal
+#         self.t                   = t0
 
-    def reset(self, initial_fitness: float) -> None:
-        self.t = self.t0
+#     def reset(self, initial_fitness: float) -> None:
+#         self.t = self.t0
 
-    def accept(self, before: float, after: float, iteration: int,
-               rng: random.Random) -> bool:
-        if after < before:
-            return True
-        if self.allow_equal and after == before:
-            return True
-        # worsening — probabilistic acceptance
-        if self.t <= 1e-12:
-            return False
-        delta = after - before
-        prob  = math.exp(-delta / self.t) if delta > 0 else 1.0
-        accepted = rng.random() < prob
-        # cool every move
-        self.t *= self.cooling
-        return accepted
+#     def accept(self, before: float, after: float, iteration: int,
+#                rng: random.Random) -> bool:
+#         if after < before:
+#             return True
+#         if self.allow_equal and after == before:
+#             return True
+#         # worsening — probabilistic acceptance
+#         if self.t <= 1e-12:
+#             return False
+#         delta = after - before
+#         prob  = math.exp(-delta / self.t) if delta > 0 else 1.0
+#         accepted = rng.random() < prob
+#         # cool every move
+#         self.t *= self.cooling
+#         return accepted
 
-    def on_stall(self) -> None:
-        # reheat when stuck
-        self.t *= self.reheat_multiplier
+#     def on_stall(self) -> None:
+#         # reheat when stuck
+#         self.t *= self.reheat_multiplier
 
-    def tighten(self, factor: float) -> None:
-        """Accelerate cooling late in search."""
-        self.t *= (1.0 - factor)
+#     def tighten(self, factor: float) -> None:
+#         """Accelerate cooling late in search."""
+#         self.t *= (1.0 - factor)
 
 
 class LateAcceptanceHillClimbing(MoveAcceptance):
@@ -342,62 +281,62 @@ class LateAcceptanceHillClimbing(MoveAcceptance):
         self.buffer = [v - (v - best) * factor for v in self.buffer]
 
 
-class GreatDelugeAcceptance(MoveAcceptance):
-    """
-    Great Deluge: accept if after <= level.
-    level decays gradually.
-    """
+# class GreatDelugeAcceptance(MoveAcceptance):
+#     """
+#     Great Deluge: accept if after <= level.
+#     level decays gradually.
+#     """
 
-    def __init__(self, initial_slack: float, decay: float,
-                 allow_equal: bool = True):
-        self.initial_slack = initial_slack
-        self.decay         = decay
-        self.allow_equal   = allow_equal
-        self.level: Optional[float] = None
+#     def __init__(self, initial_slack: float, decay: float,
+#                  allow_equal: bool = True):
+#         self.initial_slack = initial_slack
+#         self.decay         = decay
+#         self.allow_equal   = allow_equal
+#         self.level: Optional[float] = None
 
-    def reset(self, initial_fitness: float) -> None:
-        # level starts slightly above initial fitness
-        self.level = initial_fitness * (1.0 + self.initial_slack)
+#     def reset(self, initial_fitness: float) -> None:
+#         # level starts slightly above initial fitness
+#         self.level = initial_fitness * (1.0 + self.initial_slack)
 
-    def accept(self, before: float, after: float, iteration: int,
-               rng: random.Random) -> bool:
-        assert self.level is not None
-        ok = after < self.level or (self.allow_equal and after == self.level)
-        # tighten level
-        self.level *= self.decay
-        return ok
+#     def accept(self, before: float, after: float, iteration: int,
+#                rng: random.Random) -> bool:
+#         assert self.level is not None
+#         ok = after < self.level or (self.allow_equal and after == self.level)
+#         # tighten level
+#         self.level *= self.decay
+#         return ok
 
-    def on_improvement(self, new_best: float) -> None:
-        # Optionally pull level toward best
-        if self.level is not None and new_best < self.level:
-            self.level = (self.level + new_best) / 2.0
+#     def on_improvement(self, new_best: float) -> None:
+#         # Optionally pull level toward best
+#         if self.level is not None and new_best < self.level:
+#             self.level = (self.level + new_best) / 2.0
 
-    def tighten(self, factor: float) -> None:
-        """Accelerate decay of the flood level late in search."""
-        if self.level is not None:
-            self.level *= (1.0 - factor * 0.1)
+#     def tighten(self, factor: float) -> None:
+#         """Accelerate decay of the flood level late in search."""
+#         if self.level is not None:
+#             self.level *= (1.0 - factor * 0.1)
 
 
-def make_acceptance(cfg: HHConfig) -> MoveAcceptance:
-    ae = cfg.consider_equal_as_accept
-    if cfg.acceptance_kind == AcceptanceKind.IMPROVE_OR_EQUAL:
-        return ImproveOrEqualAcceptance(allow_equal=ae)
-    if cfg.acceptance_kind == AcceptanceKind.SIMULATED_ANNEALING:
-        return SimulatedAnnealingAcceptance(
-            t0=cfg.sa_t0,
-            cooling=cfg.sa_alpha,
-            reheat_multiplier=cfg.sa_reheat_multiplier,
-            allow_equal=ae,
-        )
-    if cfg.acceptance_kind == AcceptanceKind.LATE_ACCEPTANCE:
-        return LateAcceptanceHillClimbing(L=cfg.lahc_length, allow_equal=ae)
-    if cfg.acceptance_kind == AcceptanceKind.GREAT_DELUGE:
-        return GreatDelugeAcceptance(
-            initial_slack=cfg.gd_initial_slack,
-            decay=cfg.gd_decay,
-            allow_equal=ae,
-        )
-    raise ValueError(f"Unknown acceptance kind: {cfg.acceptance_kind}")
+# def make_acceptance(cfg: HHConfig) -> MoveAcceptance:
+#     ae = cfg.consider_equal_as_accept
+#     if cfg.acceptance_kind == AcceptanceKind.IMPROVE_OR_EQUAL:
+#         return ImproveOrEqualAcceptance(allow_equal=ae)
+#     if cfg.acceptance_kind == AcceptanceKind.SIMULATED_ANNEALING:
+#         return SimulatedAnnealingAcceptance(
+#             t0=cfg.sa_t0,
+#             cooling=cfg.sa_alpha,
+#             reheat_multiplier=cfg.sa_reheat_multiplier,
+#             allow_equal=ae,
+#         )
+#     if cfg.acceptance_kind == AcceptanceKind.LATE_ACCEPTANCE:
+#         return LateAcceptanceHillClimbing(L=cfg.lahc_length, allow_equal=ae)
+#     if cfg.acceptance_kind == AcceptanceKind.GREAT_DELUGE:
+#         return GreatDelugeAcceptance(
+#             initial_slack=cfg.gd_initial_slack,
+#             decay=cfg.gd_decay,
+#             allow_equal=ae,
+#         )
+#     raise ValueError(f"Unknown acceptance kind: {cfg.acceptance_kind}")
 
 
 # ===========================================================================
@@ -408,7 +347,7 @@ class AdvancedChoiceFunctionHH:
     """
     HyFlex-style HH with:
     - Extended Choice Function (F1 individual, F2 pair synergy, F3 recency)
-    - Adaptive move acceptance (LAHC / SA / GD / improve-or-equal)
+    - Late Acceptance Hill Climbing (LAHC)
     - Phase control (INTENSIFY ↔ DIVERSIFY) and random restarts
     - Tabu list + epsilon-random exploration
     - Late-search acceptance tightening
@@ -472,7 +411,10 @@ class AdvancedChoiceFunctionHH:
         self._tabu_set:  Set[int]   = set()
 
         # ---- Move acceptance ----
-        self.acceptance: MoveAcceptance = make_acceptance(self.cfg)
+        self.acceptance = LateAcceptanceHillClimbing(
+            L=self.cfg.lahc_length,
+            allow_equal=self.cfg.consider_equal_as_accept
+        )
 
         # ---- OPT 6: domain capability flag (probed once before loop) ----
         self._has_get_best: bool = False
@@ -759,7 +701,7 @@ class AdvancedChoiceFunctionHH:
 
         # Reward signal:
         # - improvements contribute strongly
-        # - accepted non-improving moves contribute a tiny bit (useful for SA/LAHC)
+        # - accepted non-improving moves contribute a tiny bit
         # - rejected moves are mildly negative
         if improved:
             reward_signal = shaped
@@ -837,7 +779,7 @@ class AdvancedChoiceFunctionHH:
         if stall < self.cfg.stall_iterations_to_restart:
             return False
 
-        # Inform acceptance method (e.g. reheat SA, pessimise LAHC buffer)
+        # Inform acceptance method (pessimise LAHC buffer)
         self.acceptance.on_stall()
 
         # Reinitialise working solution
