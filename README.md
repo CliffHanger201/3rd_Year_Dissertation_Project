@@ -100,19 +100,15 @@ python -m data_and_visualisation.src.run_pretrained
 
 ### 3. HyFlex Hyper-Heuristics
 
-#### Step 1: Compile Bridge
+#### Step 1: Compile Py4J Gateway
 ```
-javac -cp "C:\Users\xxx\AppData\Local\Programs\Python\Python313\share\py4j\py4j0.10.9.5.jar" bridge*.java
+javac -cp ".;py4j0.10.9.9.jar;hyflex\hyflex\build\libs\hyflex-1.0-SNAPSHOT.jar;hyflex\hyflex-chesc-2011\build\libs\hyflex-chesc-2011-1.0-SNAPSHOT.jar;hyflex\hyflex-ext\build\libs\hyflex-ext-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-phunter\build\libs\hyflex-hh-phunter-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-genhive\build\libs\hyflex-hh-genhive-1.0-SNAPSHOT.jar" -d data_and_visualisation\out data_and_visualisation\src\bridge\*.java
 ```
-#### Step 2: Compile Py4J Gateway
+#### Step 2: Start Py4J Gateway
 ```
-javac -cp ".;..\py4j0.10.9.9.jar;..\hyflex\hyflex\build\libs\hyflex-1.0-SNAPSHOT.jar;..\hyflex\hyflex-chesc-2011\build\libs\hyflex-chesc-2011-1.0-SNAPSHOT.jar;..\hyflex\hyflex-ext\build\libs\hyflex-ext-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-phunter\build\libs\hyflex-hh-phunter-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-genhive\build\libs\hyflex-hh-genhive-1.0-SNAPSHOT.jar" -d out src\bridge*.java
+java -cp "data_and_visualisation\out;py4j0.10.9.9.jar;hyflex\hyflex\build\libs\hyflex-1.0-SNAPSHOT.jar;hyflex\hyflex-chesc-2011\build\libs\hyflex-chesc-2011-1.0-SNAPSHOT.jar;hyflex\hyflex-ext\build\libs\hyflex-ext\build\libs\hyflex-ext-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-phunter\build\libs\hyflex-hh-phunter-1.0-SNAPSHOT.jar;hyflex\hyflex-hyperheuristics\hyflex-hh-genhive\build\libs\hyflex-hh-genhive-1.0-SNAPSHOT.jar;data_and_visualisation\src\bridge\slf4j-api-2.0.17.jar;data_and_visualisation\src\bridge\slf4j-simple-2.0.0-alpha6.jar" bridge.HyflexGateway
 ```
-#### Step 3: Start Py4J Gateway
-```
-java -cp "out;..\py4j0.10.9.9.jar;..\hyflex\hyflex\build\libs\hyflex-1.0-SNAPSHOT.jar;..\hyflex\hyflex-chesc-2011\build\libs\hyflex-chesc-2011-1.0-SNAPSHOT.jar;..\hyflex\hyflex-ext\build\libs\hyflex-ext\build\libs\hyflex-ext-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-phunter\build\libs\hyflex-hh-phunter-1.0-SNAPSHOT.jar;..\hyflex\hyflex-hyperheuristics\hyflex-hh-genhive\build\libs\hyflex-hh-genhive-1.0-SNAPSHOT.jar;src\bridge\slf4j-api-2.0.17.jar;src\bridge\slf4j-simple-2.0.0-alpha6.jar" bridge.HyflexGateway
-```
-#### Step 4: Run Python Interface (new terminal)
+#### Step 3: Run Python Interface (new terminal)
 ```
 python -m data_and_visualisation.src.run_hyflex
 ```
@@ -136,7 +132,7 @@ python -m data_and_visualisation.src.extension_visualisation
 
 ## 🧪 Compilation Check
 ```
-javap -cp "..\hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar" be.kuleuven.kahosl.acceptance.AcceptanceCriterionType
+javap -cp "\hyflex\hyflex-hyperheuristics\hyflex-hh-adaphh\build\libs\hyflex-hh-adaphh-1.0-SNAPSHOT.jar" be.kuleuven.kahosl.acceptance.AcceptanceCriterionType
 ```
 ---
 
