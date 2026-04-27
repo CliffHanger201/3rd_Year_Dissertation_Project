@@ -21,7 +21,7 @@ import os
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
-# ── Config ──────────────────────────────────────────────────────────────────
+# ----- Config -----
 
 JAVA_FILE       = "results/java_hhs_all_domains_results.json"
 PYTHON_FILE     = "results/python_hh_all_domains_results.json"
@@ -31,14 +31,14 @@ DOMAINS     = ["SAT", "VRP", "TSP", "BinPacking"]
 
 JAVA_HHS    = ["AdapHH", "PHunter", "GenHive"]
 PYTHON_HH   = "MyHyperHeuristic"
-PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"
+# PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"
 
 HH_COLOURS  = {
     "AdapHH":           "#e6194b",
     "PHunter":          "#3cb44b",
     "GenHive":          "#4363d8",
     PYTHON_HH:          "#f58231",
-    PRETRAINED_HH:      "#911eb4",
+    # PRETRAINED_HH:      "#911eb4",
 }
 
 SAVE_DIR = "results/plots"
@@ -47,8 +47,17 @@ DOMAIN_ALIASES = {
     "BinPacking": "Bin",
 }
 
+plt.rcParams.update({
+    "font.size":        14,   # default text / tick labels
+    "axes.titlesize":   15,   # subplot titles
+    "axes.labelsize":   14,   # x/y axis labels
+    "xtick.labelsize":  13,   # x tick numbers
+    "ytick.labelsize":  13,   # y tick numbers
+    "legend.fontsize":  13,   # legend entries
+    "figure.titlesize": 16,   # fig.suptitle
+})
 
-# ── Save helper ──────────────────────────────────────────────────────────────
+# ----- Save helper -----
 
 def _savefig(name: str) -> None:
     """Save the current figure to SAVE_DIR."""
@@ -58,7 +67,7 @@ def _savefig(name: str) -> None:
     print(f"Saved: {path}")
 
 
-# ── Data loading helpers ─────────────────────────────────────────────────────
+# -------- Data loading helpers --------
 
 def load_json(path):
     with open(path, "r") as f:
@@ -77,8 +86,7 @@ def get_java_runs(java_data, hh_name, domain):
         if isinstance(r, dict) and r.get("domain_name") == domain
     ]
 
-
-# ── Computation helpers ──────────────────────────────────────────────────────
+# ------- Computation helpers -------
 
 def median_trace(runs):
     traces = []
@@ -115,7 +123,7 @@ def collect_per_heuristic(runs, key):
     return box_data, n
 
 
-# ── Plot 1: Fitness traces ───────────────────────────────────────────────────
+# ---------------- Plot 1: Fitness traces ----------------
 
 def plot_fitness_traces(java_data, py_data, pretrained_data,
                         filename_template="{domain}_fitness_multi_{i}"):
@@ -141,19 +149,20 @@ def plot_fitness_traces(java_data, py_data, pretrained_data,
                     color=HH_COLOURS[PYTHON_HH], linewidth=2, linestyle="--")
             any_trace = True
 
-        pre_runs  = get_python_runs(pretrained_data, domain)
-        pre_trace = median_trace(pre_runs)
-        if pre_trace is not None:
-            ax.plot(pre_trace, label=f"{PRETRAINED_HH} (median)",
-                    color=HH_COLOURS[PRETRAINED_HH], linewidth=2, linestyle="--")
-            any_trace = True
+        # pre_runs  = get_python_runs(pretrained_data, domain)
+        # pre_trace = median_trace(pre_runs)
+        # if pre_trace is not None:
+        #     ax.plot(pre_trace, label=f"{PRETRAINED_HH} (median)",
+        #             color=HH_COLOURS[PRETRAINED_HH], linewidth=2, linestyle="--")
+        #     any_trace = True
 
         if not any_trace:
             print(f"[fitness trace] No data for domain: {domain}")
             plt.close(fig)
             continue
 
-        ax.set_title(f"{domain} — Fitness Trace (median across runs)")
+        ax.set_title(f"{domain} — Fitness Trace (median across runs)",
+                     fontweight="bold")
         ax.set_xlabel("Trace step")
         ax.set_ylabel("Objective value (lower is better)")
         ax.legend()
@@ -164,7 +173,7 @@ def plot_fitness_traces(java_data, py_data, pretrained_data,
         plt.show()
 
 
-# ── Plot 2 & 3: Boxplots ─────────────────────────────────────────────────────
+# ---------------- Plot 2 & 3: Boxplots ------------------
 
 def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
                   filename_template="{domain}_{key}_multi_{i}"):
@@ -172,7 +181,7 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
     One figure per domain.
     For each heuristic ID, draw one box per HH side-by-side.
     """
-    all_hh_labels = JAVA_HHS + [PYTHON_HH, PRETRAINED_HH]
+    all_hh_labels = JAVA_HHS + [PYTHON_HH] #, PRETRAINED_HH]
     n_hhs = len(all_hh_labels)
 
     for i, domain in enumerate(DOMAINS, start=1):
@@ -191,10 +200,10 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
         hh_boxes[PYTHON_HH] = bd
         max_h = max(max_h, nh)
 
-        pre_runs = get_python_runs(pretrained_data, domain)
-        bd, nh   = collect_per_heuristic(pre_runs, key)
-        hh_boxes[PRETRAINED_HH] = bd
-        max_h = max(max_h, nh)
+        # pre_runs = get_python_runs(pretrained_data, domain)
+        # bd, nh   = collect_per_heuristic(pre_runs, key)
+        # hh_boxes[PRETRAINED_HH] = bd
+        # max_h = max(max_h, nh)
 
         if max_h == 0:
             print(f"[{key}] No data for domain: {domain}")
@@ -235,7 +244,8 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
 
         ax.set_xticks(range(max_h))
         ax.set_xticklabels([f"H{h}" for h in range(max_h)])
-        ax.set_title(f"{domain} — {title} (distribution across runs)")
+        ax.set_title(f"{domain} — {title} (distribution across runs)",
+                     fontweight="bold")
         ax.set_xlabel("Heuristic ID")
         ax.set_ylabel(ylabel)
         ax.grid(True, axis="y")

@@ -1,6 +1,6 @@
 """
-python_hyper_heuristic.src.hyperheuristic.py
-
+hyperheuristic.py
+===============================================
 An advanced HyFlex-style hyper-heuristic (HH) based on an extended Choice Function
 with adaptive move acceptance, phases, and robust statistics.
 
@@ -42,7 +42,6 @@ from python_hyper_heuristic.domains.Python.AbstractProblem.ProblemDomain import 
 # Pre-computed lookup tables  (built once at import time, zero loop overhead)
 # ===========================================================================
 
-# OPT 2: log1p table — recency is always a non-negative integer so a list
 # lookup replaces the transcendental call in the CF inner loop.
 _LOG1P_TABLE_SIZE = 4096
 _LOG1P_TABLE: List[float] = [math.log1p(i) for i in range(_LOG1P_TABLE_SIZE)]
@@ -53,7 +52,6 @@ def _fast_log1p(x: int) -> float:
     return _LOG1P_TABLE[x] if x < _LOG1P_TABLE_SIZE else math.log1p(x)
 
 
-# OPT 3: shaped-delta table — sign(delta)*log1p(|delta|) keyed on int(|delta|).
 _SHAPED_TABLE_CAP = 1024
 _SHAPED_POS: List[float] = [math.log1p(i) for i in range(_SHAPED_TABLE_CAP)]
 
@@ -266,9 +264,8 @@ class LateAcceptanceHillClimbing(MoveAcceptance):
         return ok
 
     def on_stall(self) -> None:
-        # BUG FIX 1: pessimise buffer to the worst stored value so that
-        # post-restart moves can be accepted again.  Without this the buffer
-        # retains pre-restart (better) fitness values and rejects everything.
+        # Pessimise buffer to the worst stored value
+        # This will allow post-restart moves to be accepted again
         if self.buffer:
             worst = max(self.buffer)
             self.buffer = [worst] * self.L
@@ -352,7 +349,6 @@ class AdvancedChoiceFunctionHH:
     - Tabu list + epsilon-random exploration
     - Late-search acceptance tightening
     - HyFlex-style trace checkpoints
-    - All six performance optimisations (OPT 1-6) and three bug fixes
     """
 
     TRACE_CHECKPOINTS_DEFAULT = 101
@@ -405,7 +401,6 @@ class AdvancedChoiceFunctionHH:
         # ---- Tabu structures ----
         # self.tabu is the canonical deque (preserved for external access,
         # e.g. PreTrainedHH reads it directly).
-        # OPT 1: self._tabu_set is kept in sync so _select_heuristic never
         # calls set(self.tabu) inside the hot loop.
         self.tabu:       Deque[int] = deque()
         self._tabu_set:  Set[int]   = set()
@@ -416,7 +411,6 @@ class AdvancedChoiceFunctionHH:
             allow_equal=self.cfg.consider_equal_as_accept
         )
 
-        # ---- OPT 6: domain capability flag (probed once before loop) ----
         self._has_get_best: bool = False
 
     # =======================================================================
@@ -485,7 +479,7 @@ class AdvancedChoiceFunctionHH:
 
         self.trace           = [0.0] * self.cfg.trace_checkpoints
         self.initial_time_ns = time.process_time_ns()
-        self._solve(self.problem)
+        self.solve(self.problem)
 
     def isCrossover(self, index: int) -> bool:
         return index in self.crossover_set
@@ -510,7 +504,6 @@ class AdvancedChoiceFunctionHH:
         """
         MUST be called at the top of the main loop.
         Updates trace checkpoints in a HyFlex-like way.
-        OPT 6: uses self._has_get_best to avoid try/except every iteration.
         """
         assert self.trace is not None
         current_ns = time.process_time_ns() - self.initial_time_ns
@@ -561,7 +554,6 @@ class AdvancedChoiceFunctionHH:
     def _init_stats(self, h_count: int) -> None:
         self.h_stats = [HeuristicStats() for _ in range(h_count)]
         self.p_stats = [[PairStats() for _ in range(h_count)] for _ in range(h_count)]
-        # OPT 1: reset both tabu structures together
         self.tabu.clear()
         self._tabu_set.clear()
 
@@ -589,14 +581,14 @@ class AdvancedChoiceFunctionHH:
         if prev_h is not None:
             f2 = self.p_stats[prev_h][h].synergy_ema
 
-        # F3 — OPT 2: integer table lookup instead of math.log1p**
+        # F3
         recency = self.iteration - hs.last_used_iter
         if recency < 0:
             recency = 0
         f3 = math.log1p(recency)
 
-        # Phase shaping: in diversify we upweight recency and downweight
-        # pure reward slightly to encourage exploration.
+        # Phase shaping: During diversification, favour unseen heuristics (higher gamma) over
+        # historically rewarding ones (lower alpha) to escape local optima.
         if self.phase == Phase.DIVERSIFY:
             alpha = self.cfg.alpha * 0.8
             beta  = self.cfg.beta  * 0.9
@@ -615,16 +607,14 @@ class AdvancedChoiceFunctionHH:
     def _select_heuristic(self, h_count: int, prev_h: Optional[int]) -> int:
         """
         Select a heuristic using the choice function + epsilon exploration + tabu.
-        OPT 1: uses self._tabu_set directly — no set() rebuild each call.
-        BUG FIX 3: falls back to unconstrained scan when all heuristics are tabu.
         """
         # Small chance of random exploration
         if self.rng.random() < self.cfg.epsilon:
             return self.rng.randrange(h_count)
 
-        tabu_set = self._tabu_set  # OPT 1: local alias, no copy or rebuild
+        tabu_set = self._tabu_set
 
-        best_h     = -1   # BUG FIX 3: use sentinel, not 0
+        best_h     = -1   # Sentinel value
         best_score = -float("inf")
 
         for h in range(h_count):
@@ -635,9 +625,7 @@ class AdvancedChoiceFunctionHH:
                 best_score = s
                 best_h     = h
 
-        # BUG FIX 3: if every heuristic is tabu (tenure >= h_count), fall back
-        # to the best-scoring heuristic ignoring tabu rather than silently
-        # returning H0 (which can be extremely expensive on some domains).
+        # Fall back to the best-scoring heuristic
         if best_h == -1:
             for h in range(h_count):
                 s = self._choice_function_score(h, prev_h)
@@ -655,12 +643,12 @@ class AdvancedChoiceFunctionHH:
         if self.cfg.tabu_tenure <= 0:
             return
         self.tabu.append(h)
-        self._tabu_set.add(h)   # OPT 1: keep live set in sync
+        self._tabu_set.add(h)
         while len(self.tabu) > self.cfg.tabu_tenure:
             evicted = self.tabu.popleft()
-            # BUG FIX 2: only discard from set when no further occurrence of
-            # this heuristic remains in the deque (it may have been called
-            # multiple times within one tenure window).
+            
+            # Discard from set when no further occurrence of this heuristic 
+            # remains in the deque
             if evicted not in self.tabu:
                 self._tabu_set.discard(evicted)
 
@@ -684,8 +672,7 @@ class AdvancedChoiceFunctionHH:
         - acceptance (small positive for enabling escapes)
         - worsening (negative penalty)
 
-        # OPT 3: shaped delta uses pre-built table instead of math.log1p + math.copysign.
-        # Smoothing constants cached as locals to avoid repeated attribute lookups.
+        Smoothing constants cached as locals to avoid repeated attribute lookups.
         """
         hs = self.h_stats[h]
         hs.uses += 1
@@ -696,7 +683,6 @@ class AdvancedChoiceFunctionHH:
 
         # Improvement magnitude (minimisation) — positive = better
         delta = before - after
-        # OPT 3: table lookup for sign(delta)*log1p(|delta|)
         shaped = math.copysign(math.log1p(abs(delta)), delta) if delta != 0.0 else 0.0
 
         # Reward signal:
@@ -809,15 +795,13 @@ class AdvancedChoiceFunctionHH:
     # Main solve loop
     # =======================================================================
 
-    def _solve(self, problem) -> None:
+    def solve(self, problem) -> None:
         h_count = int(problem.getNumberOfHeuristics())
         if h_count <= 0:
             raise RuntimeError("Problem domain reports 0 heuristics")
 
         self.setHeuristicClassTypes(problem)
 
-        # OPT 6: probe getBestSolutionValue support once, before the loop,
-        # so hasTimeExpired() uses a plain `if` with no exception machinery.
         try:
             problem.getBestSolutionValue()
             self._has_get_best = True
@@ -857,7 +841,7 @@ class AdvancedChoiceFunctionHH:
         for idx in range(POOL_START, POOL_END):
             problem.copySolution(A, idx)
 
-        # OPT 4: index-swap pointers (no copy on rejection)
+        # index-swap pointers (no copy on rejection)
         cur_idx  = A
         cand_idx = B
 
@@ -865,7 +849,7 @@ class AdvancedChoiceFunctionHH:
         self.best_fitness = current_fit
         self.acceptance.reset(initial_fitness=current_fit)
 
-        # OPT 5: pre-compute crossover existence once before the loop
+        # pre-compute crossover existence once before the loop
         has_crossover = bool(self.crossover_set)
 
         # Tightening threshold in nanoseconds (for late-search acceptance narrowing)
@@ -885,7 +869,7 @@ class AdvancedChoiceFunctionHH:
                 for idx in range(self.pool_start, self.pool_end):
                     problem.copySolution(cur_idx, idx)
                 current_fit       = float(problem.getFunctionValue(cur_idx))
-                # BUG FIX 1: reset acceptance to new fitness so LAHC buffer
+                # Reset acceptance to new fitness so buffer
                 # reflects the (worse) post-restart solution, not stale values.
                 self.acceptance.reset(initial_fitness=current_fit)
                 # Reset best_fitness to new start so stall counter works correctly
@@ -904,7 +888,7 @@ class AdvancedChoiceFunctionHH:
             # ---- Apply heuristic (HyFlex: from current slot to candidate slot) ----
             before = current_fit
 
-            # OPT 5: inline crossover guard using pre-computed boolean
+            # inline crossover guard using pre-computed boolean
             if has_crossover and h in self.crossover_set:
                 parent2 = self.rng.randrange(self.pool_start, self.pool_end)
                 problem.applyHeuristic(h, cur_idx, parent2, cand_idx)
@@ -917,7 +901,7 @@ class AdvancedChoiceFunctionHH:
             accepted = self.acceptance.accept(before, after, self.iteration, self.rng)
 
             if accepted:
-                # OPT 4: swap indices — free (two int assignments, no memory copy)
+                # swap indices — free (two int assignments, no memory copy)
                 cur_idx, cand_idx = cand_idx, cur_idx
                 current_fit = after
 

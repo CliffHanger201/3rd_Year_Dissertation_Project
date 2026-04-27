@@ -5,33 +5,33 @@ Visualisation for single-instance pre-training results.
 
 Sections
 --------
-  §1  Fitness convergence — 4 panels per domain
+  §1  Fitness convergence - 4 panels per domain
         Pre-training (instance 1) + test instances 1.2, 1.3, 1.4.
         Directly shows whether the frozen policy converges on unseen instances.
 
-  §2  Q-Table heatmaps — per domain, 2 rows × 4 columns:
+  §2  Q-Table heatmaps - per domain, 2 rows × 4 columns:
         Row 1: actual Q-values (mean / max / min) loaded from pkl files.
                 Train pkl and eval pkls are loaded separately.
                 Eval Q-values are identical to training (freeze confirmed).
         Row 2: heuristic usage fractions derived from call counts (JSON).
                 These DO differ across instances, showing behavioural change.
 
-  §3  Q-Table state breadth — bar chart per domain
+  §3  Q-Table state breadth - bar chart per domain
         Training state count (from pkl) vs. test-instance state counts
         (from JSON qtable_state_count).  Shows how much of the Q-Table
         is exercised on each instance.
 
-  §4  Heuristic usage trends across repeats — 4 panels per domain
-        Panel 1: Pre-training  — call counts per outer run (last pass).
-        Panel 2: Test 1.2      — call counts per repeat.
+  §4  Heuristic usage trends across repeats - 4 panels per domain
+        Panel 1: Pre-training  - call counts per outer run (last pass).
+        Panel 2: Test 1.2      - call counts per repeat.
         Panel 3: Test 1.3
         Panel 4: Test 1.4
         Each line = one heuristic.  Directly comparable across all 4 panels.
 
-  §5  Final best-value distributions — strip chart per domain
+  §5  Final best-value distributions - strip chart per domain
         Grouped by Q-Table label; shows relative difficulty of test instances.
 
-  §6  Improvement ratio — strip chart per domain
+  §6  Improvement ratio - strip chart per domain
         Improvement ratio = (init − best) / |init|.
         Together reveal whether the frozen policy transfers effectively.
 
@@ -69,7 +69,7 @@ DOMAINS = ["SAT", "VRP", "TSP", "BinPacking"]
 ALPHA_THIN = 0.18
 CMAP_TRACES = "tab10"
 
-# Colours — one per label (train + 3 test instances)
+# Colours - one per label (train + 3 test instances)
 LABEL_COLOURS = {
     "train": "#2E86AB",
     "1.2":   "#4C72B0",
@@ -264,12 +264,12 @@ def _draw_heatmap(
 
 
 # =============================================================================
-# §1  Fitness convergence — 4 panels per domain
+# §1  Fitness convergence - 4 panels per domain
 # =============================================================================
 
 def plot_fitness_traces(data: dict, filename_template="{domain}_ext_fitness") -> None:
     """
-    §1 — One figure per domain, four panels:
+    §1 - One figure per domain, four panels:
       [Test 1.2] [Test 1.3] [Test 1.4]
 
     Faint lines = individual runs.  Bold line = median.
@@ -304,7 +304,7 @@ def plot_fitness_traces(data: dict, filename_template="{domain}_ext_fitness") ->
         fig.suptitle(
             f"{domain}: Fitness convergence  "
             f"(pre-training on instance 1  →  frozen transfer to test instances)",
-            fontsize=12, fontweight="bold",
+            fontsize=15, fontweight="bold",
         )
 
         for col_idx, panel in enumerate(all_panels):
@@ -334,17 +334,18 @@ def plot_fitness_traces(data: dict, filename_template="{domain}_ext_fitness") ->
                         label=f"Median (n={len(traces)})")
                 ax.set_yscale("log")
                 ax.grid(True, which="both", alpha=0.25)
-                ax.legend(fontsize=8, loc="upper right")
+                ax.legend(fontsize=12, loc="upper right")
             else:
                 ax.text(0.5, 0.5,
                         "No fitness trace\ncaptured\n(check getFitnessTrace)",
                         transform=ax.transAxes, ha="center", va="center",
-                        fontsize=9, color="gray")
+                        fontsize=12, color="gray")
 
-            ax.set_title(title, fontsize=10, fontweight="bold", color=colour)
-            ax.set_xlabel("Trace step", fontsize=9)
+            ax.set_title(title, fontsize=13, fontweight="bold", color=colour)
+            ax.set_xlabel("Trace step", fontsize=12)
+            ax.tick_params(axis="both", labelsize=11)
             if col_idx == 0:
-                ax.set_ylabel("Objective value (log scale)", fontsize=9)
+                ax.set_ylabel("Objective value (log scale)", fontsize=12)
 
         plt.tight_layout()
         _savefig(filename_template.format(domain=display_domain))
@@ -352,20 +353,20 @@ def plot_fitness_traces(data: dict, filename_template="{domain}_ext_fitness") ->
 
 
 # =============================================================================
-# §2  Q-Table heatmaps — 2 rows × 4 columns per domain
+# §2  Q-Table heatmaps - 2 rows × 4 columns per domain
 # =============================================================================
 
 def plot_qtable_heatmaps(data: dict, filename_template="{domain}_ext_qtable") -> None:
     """
-    §2 — One figure per domain.  Layout: 2 rows × (1 + n_test_labels) columns.
+    §2 - One figure per domain.  Layout: 2 rows × (1 + n_test_labels) columns.
 
-    Row 1 — Q-values from pkl files (mean / max / min across visited states).
+    Row 1 - Q-values from pkl files (mean / max / min across visited states).
       Col 0     : training Q-Table (qtable_{domain}_train{id}_latest.pkl).
       Col 1-3   : evaluation Q-Tables (frozen snapshots).
-                  Q-values should be IDENTICAL to training — this is the
+                  Q-values should be IDENTICAL to training - this is the
                   expected result of the freeze and acts as a sanity check.
 
-    Row 2 — Heuristic usage fractions from JSON call counts.
+    Row 2 - Heuristic usage fractions from JSON call counts.
       These DO differ across instances, showing how the same frozen policy
       selects different heuristics on different problem structures.
 
@@ -475,12 +476,12 @@ def plot_qtable_heatmaps(data: dict, filename_template="{domain}_ext_qtable") ->
 
 
 # =============================================================================
-# §3  Q-Table state breadth — bar chart per domain
+# §3  Q-Table state breadth - bar chart per domain
 # =============================================================================
 
 def plot_qtable_state_counts(data: dict, filename_template="qtable_state_breadth") -> None:
     """
-    §3 — Q-Table state breadth shown as a frequency heatmap.
+    §3 - Q-Table state breadth shown as a frequency heatmap.
     Rows = labels (train + test instances).
     Columns = distinct state count values observed across runs.
     Cell value = number of runs that produced that state count.
@@ -504,7 +505,7 @@ def plot_qtable_state_counts(data: dict, filename_template="qtable_state_breadth
     fig.suptitle(
         "Q-Table state breadth: frequency of state counts across runs",
         # "Cell = number of runs producing that state count  |  "
-        # "Train and test rows should match — divergence = unexpected mutation.",
+        # "Train and test rows should match - divergence = unexpected mutation.",
         fontsize=11, fontweight="bold",
     )
 
@@ -575,12 +576,12 @@ def plot_qtable_state_counts(data: dict, filename_template="qtable_state_breadth
 
 
 # =============================================================================
-# §4  Heuristic usage trends across repeats — 4 panels per domain
+# §4  Heuristic usage trends across repeats - 4 panels per domain
 # =============================================================================
 
 def plot_heuristic_usage_trends(data: dict, filename_template="{domain}_heuristic_usage_trends") -> None:
     """
-    §4 — One figure per domain, four panels (train + 3 test instances).
+    §4 - One figure per domain, four panels (train + 3 test instances).
 
     All four panels share the same layout:
       X-axis : repeat number (1 → n_runs).
@@ -632,7 +633,7 @@ def plot_heuristic_usage_trends(data: dict, filename_template="{domain}_heuristi
         fig.suptitle(
             f"{domain}: Heuristic usage trends across repeats\n"
             f"(each line = one heuristic  |  dashed = linear trend)",
-            fontsize=12, fontweight="bold",
+            fontsize=15, fontweight="bold",
         )
 
         colours = plt.get_cmap(CMAP_TRACES, h_count)
@@ -683,15 +684,16 @@ def plot_heuristic_usage_trends(data: dict, filename_template="{domain}_heuristi
                     ax.plot(x_vals, np.poly1d(z)(x_vals),
                             color=col, linewidth=0.8, linestyle="--", alpha=0.55)
 
-            ax.set_title(title, fontsize=10, fontweight="bold", color=colour)
+            ax.set_title(title, fontsize=13, fontweight="bold", color=colour)
             ax.set_xlabel(
                 "Run number" if panel == "train" else "Repeat (seed index)",
-                fontsize=9,
+                fontsize=12,
             )
+            ax.tick_params(axis="both", labelsize=11)
             if col_idx == 0:
-                ax.set_ylabel("Call count", fontsize=9)
+                ax.set_ylabel("Call count", fontsize=12)
             ax.grid(True, alpha=0.25)
-            ax.legend(fontsize=7, ncol=max(1, h_count // 5),
+            ax.legend(fontsize=11, ncol=max(1, h_count // 5),
                       loc="upper right", framealpha=0.7)
 
         plt.tight_layout()
@@ -700,12 +702,12 @@ def plot_heuristic_usage_trends(data: dict, filename_template="{domain}_heuristi
 
 
 # =============================================================================
-# §5  Final best-value distributions — strip chart per domain
+# §5  Final best-value distributions - strip chart per domain
 # =============================================================================
 
 def plot_final_value_distributions(data: dict, filename_template="domain_best_strip_chart") -> None:
     """
-    §5 — Strip chart of final best_value per repeat, grouped by Q-Table label.
+    §5 - Strip chart of final best_value per repeat, grouped by Q-Table label.
     One panel per domain.  Lower = better (minimisation).
 
     Directly answers: how hard are the test instances relative to each other?
@@ -755,7 +757,7 @@ def plot_final_value_distributions(data: dict, filename_template="domain_best_st
         ax.set_yscale("log")
         ax.grid(True, axis="y", alpha=0.3)
         ax.legend(
-            fontsize=7, loc="upper center",
+            fontsize=9, loc="upper center",
             bbox_to_anchor=(0.5, -0.28),
             framealpha=0.9,
             borderpad=0.8,
@@ -770,12 +772,12 @@ def plot_final_value_distributions(data: dict, filename_template="domain_best_st
 
 
 # =============================================================================
-# §6  Improvement ratio — strip chart per domain
+# §6  Improvement ratio - strip chart per domain
 # =============================================================================
 
 def plot_improvement_ratio(data: dict, filename_template="domain_improvement_strip_chart") -> None:
     """
-    §6 — Strip chart of improvement ratio per test instance, one panel per domain.
+    §6 - Strip chart of improvement ratio per test instance, one panel per domain.
     improvement_ratio = (initial_value − best_value) / |initial_value|
     Values above 0 = policy improved the initial solution.
     Values near 1  = near-complete improvement.

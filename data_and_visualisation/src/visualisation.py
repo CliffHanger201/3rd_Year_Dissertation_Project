@@ -1,4 +1,6 @@
 """
+visualisation.py
+=====================================
 Visualisation for hyper-heuristic performance across all HyFlex-style domains.
 
 Expects the combined output file produced by run_hyflex_all_domains():
@@ -22,6 +24,15 @@ DOMAIN_ALIASES = {
     "BinPacking": "Bin",
 }
 
+plt.rcParams.update({
+    "font.size":        13,   # default text / tick labels
+    "axes.titlesize":   15,   # subplot titles
+    "axes.labelsize":   13,   # x/y axis labels
+    "xtick.labelsize":  12,   # x tick numbers
+    "ytick.labelsize":  12,   # y tick numbers
+    "legend.fontsize":  12,   # legend entries
+    "figure.titlesize": 16,   # fig.suptitle
+})
 
 def _savefig(name: str) -> None:
     """Save the current figure to SAVE_DIR, then show it."""
@@ -117,7 +128,7 @@ def plot_fitness_traces_multi(all_data, meta, max_runs_to_overlay=None, show_med
             plt.legend()
         plt.yscale("log")
         plt.tight_layout()
-        _savefig(filename_template.format(domain=display_domain, i=i))
+        _savefig(filename_template.format(domain=display_domain, i=1))
         plt.show()
 
         any_plotted = True
@@ -188,7 +199,7 @@ def plot_heuristic_boxplots(all_data, key: str, title: str, ylabel: str,
         plt.grid(True, axis="y")
         plt.yscale("log")
         plt.tight_layout()
-        _savefig(filename_template.format(domain=display_domain, key=key, i=i))
+        _savefig(filename_template.format(domain=display_domain, key=key, i=1))
         plt.show()
 
         any_plotted = True
@@ -209,7 +220,7 @@ def main():
         meta,
         max_runs_to_overlay=30,
         show_median=True,
-        filename_template="{domain}_Fitness_{i}",    # → SAT_fitness_log1, VRP_fitness_log2 ...
+        filename_template="{domain}_Fitness_{i}",
     )
 
     # 2) Heuristic usage distributions (calls) per domain
@@ -218,7 +229,7 @@ def main():
         key="heuristic_call_counts",
         title="Heuristic usage (call counts)",
         ylabel="Calls",
-        filename_template="{domain}_Usage_{i}",         # → SAT_usage_1, VRP_usage_2 ...
+        filename_template="{domain}_Usage_{i}",
     )
 
     # 3) Heuristic runtime distributions (ms) per domain
@@ -227,92 +238,9 @@ def main():
         key="heuristic_call_times_ms",
         title="Heuristic total runtime (ms)",
         ylabel="Total time (ms)",
-        filename_template="{domain}_Runtime_{i}",       # → SAT_runtime_1, VRP_runtime_2 ...
+        filename_template="{domain}_Runtime_{i}",
     )
 
 
 if __name__ == "__main__":
     main()
-
-
-# """
-# Visualisation for the hyper-heuristic performance (HyFlex-style output)
-# """
-
-# import json
-# import matplotlib.pyplot as plt
-
-
-# RESULT_FILE = "hh_sat_results.json"
-
-
-# def main():
-#     with open(RESULT_FILE, "r") as f:
-#         data = json.load(f)
-
-#     domain = data.get("domain", "SAT")
-#     instance_id = data.get("instance_id", None)
-#     seed = data.get("seed", None)
-#     time_limit_ms = data.get("time_limit_ms", None)
-
-#     fitness_trace = data.get("fitness_trace", None)
-#     best_value = data.get("best_value", None)
-
-#     if not fitness_trace:
-#         raise ValueError(
-#             "No fitness_trace found in JSON. "
-#             "Make sure your HyperHeuristic writes fitness_trace (hh.getFitnessTrace())."
-#         )
-
-#     # --- Plot 1: Best-so-far fitness trace ---
-#     plt.figure(figsize=(10, 6))
-#     plt.plot(fitness_trace, label="Best-so-far objective")
-
-#     if best_value is not None:
-#         plt.axhline(best_value, linestyle="--", label=f"Final best = {best_value}")
-
-#     title_bits = [f"{domain} progress"]
-#     if instance_id is not None:
-#         title_bits.append(f"instance {instance_id}")
-#     if seed is not None:
-#         title_bits.append(f"seed {seed}")
-#     if time_limit_ms is not None:
-#         title_bits.append(f"{time_limit_ms} ms")
-
-#     plt.title(" | ".join(title_bits))
-#     plt.xlabel("Trace step")
-#     plt.ylabel("Broken / unsatisfied clauses (lower is better)")
-#     plt.grid(True)
-#     plt.legend()
-#     plt.tight_layout()
-#     plt.show()
-
-#     # --- Plot 2 (optional): heuristic usage (calls) ---
-#     call_counts = data.get("heuristic_call_counts", None)
-#     if call_counts:
-#         plt.figure(figsize=(10, 4))
-#         xs = list(range(len(call_counts)))
-#         plt.bar(xs, call_counts)
-#         plt.title("Heuristic usage (call counts)")
-#         plt.xlabel("Heuristic ID")
-#         plt.ylabel("Calls")
-#         plt.grid(True, axis="y")
-#         plt.tight_layout()
-#         plt.show()
-
-#     # --- Plot 3 (optional): heuristic time (ms) ---
-#     call_times = data.get("heuristic_call_times_ms", None)
-#     if call_times:
-#         plt.figure(figsize=(10, 4))
-#         xs = list(range(len(call_times)))
-#         plt.bar(xs, call_times)
-#         plt.title("Heuristic total runtime (ms)")
-#         plt.xlabel("Heuristic ID")
-#         plt.ylabel("Total time (ms)")
-#         plt.grid(True, axis="y")
-#         plt.tight_layout()
-#         plt.show()
-
-
-# if __name__ == "__main__":
-#     main()

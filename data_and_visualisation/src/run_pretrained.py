@@ -23,13 +23,13 @@ from collections import defaultdict
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Type, DefaultDict
 
-# ── Domain imports ─────────────────────────────────────────────────────────────
+# ----- Domain imports -----
 from python_hyper_heuristic.domains.Python.SAT.SAT import SAT
 from python_hyper_heuristic.domains.Python.VRP.VRP import VRP
 from python_hyper_heuristic.domains.Python.BinPacking.BinPacking import BinPacking
 from python_hyper_heuristic.domains.Python.TSP.TSP import TSP
 
-# ── Pre-training imports ───────────────────────────────────────────────────────
+# ----- Pre-training imports -----
 from pretrained_hyper_heuristic.src.pretrain_hyperheuristic import PreTrainedHH, HHConfig, pretrain_and_deploy, HAS_KERAS
 
 
@@ -175,7 +175,7 @@ def pretrain_domain(
         use_surrogate=use_surrogate and HAS_KERAS,
     )
 
-    # ── Loop here: rebuild problems with a fresh seed each run ──────────────
+    # Loop here: rebuild problems with a fresh seed each run
     for run_idx in range(n_pretrain_runs):
         # Different seed each run = different starting conditions each time
         run_problems = [
@@ -312,7 +312,7 @@ def run_pretrained_all_domains(
 
     all_results: DefaultDict[str, List[DomainRunResult]] = defaultdict(list)
 
-    # ── Phase 1: Pre-train ────────────────────────────────────────────────────
+    # ----- Phase 1: Pre-train -----
     print("\n" + "=" * 60)
     print("PHASE 1 — PRE-TRAINING")
     print(f"  Training instances : {train_instance_ids}")
@@ -337,7 +337,7 @@ def run_pretrained_all_domains(
             qtable_save_path=os.path.join(qtable_dir, f"qtable_{name}.pkl"),
         )
 
-    # ── Phase 2: Evaluate ─────────────────────────────────────────────────────
+    # --------- Phase 2: Evaluate ---------
     print("\n" + "=" * 60)
     print("PHASE 2 — EVALUATION")
     print(f"  Runs : {n_runs}  |  Time limit : {time_limit_ms} ms  |  Instance : {test_instance}")

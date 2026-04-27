@@ -20,19 +20,6 @@ ONLINE DEPLOYMENT
   10. Continued Q updates      (small learning rate, small re-introduced ε)
   11. Sliding window tracker   (dynamic tail system adjustment)
   12. Transfer injection       (load pre-trained Q at construction time)
-
-Compatibility notes (updated for rebuilt base HH)
---------------------------------------------------
-- self.tabu (deque) is preserved on AdvancedChoiceFunctionHH; this file reads
-  it directly in _select_heuristic's tabu_set construction.
-- self._tabu_set (live set, OPT 1) is also available but PreTrainedHH only
-  needs to read tabu membership — it uses the inherited _select_heuristic
-  override which reconstructs its own tabu_set from self.tabu for clarity.
-- restart_count and total_improves are now tracked on the base class and are
-  available for logging.
-- tighten() is now present on all acceptance classes; PreTrainedHH does not
-  need to override it.
-- _has_get_best is set inside _solve before the loop; no change needed here.
 """
 
 from __future__ import annotations
@@ -726,17 +713,6 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
     - Online Q updates (§10)
     - Sliding-window tracking (§11)
     - Transition hook for offline data collection
-
-    Compatibility with rebuilt base HH
-    ------------------------------------
-    - self.tabu (deque) is read in our tabu_set construction below.
-    - self._tabu_set (live set, OPT 1) is available but we don't need it here
-      because we build our own masked score vector rather than scanning.
-    - restart_count / total_improves are set by the base _solve and available
-      for logging after a run.
-    - tighten() on acceptance classes is handled entirely by the base _solve;
-      no override needed here.
-    - _has_get_best is set in the base _solve before the loop; no change needed.
     """
 
     def __init__(
@@ -750,7 +726,7 @@ class PreTrainedHH(AdvancedChoiceFunctionHH):
         run_number:  int   = 1,
     ):
         # Stash the qtable BEFORE super().__init__() because _init_stats
-        # (called from _solve) needs to reference it.
+        # (called from solve) needs to reference it.
         self._injected_qtable = qtable
         super().__init__(seed=seed, config=config)
         # Restore after super().__init__() which may have called _init_stats

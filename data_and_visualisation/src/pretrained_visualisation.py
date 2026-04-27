@@ -1,8 +1,10 @@
 """
+pretrained_visualisation.py
+===========================
 Visualisation for hyper-heuristic results: normal vs pretrained.
 
 File layout expected
-────────────────────
+--------------------
 Q-Tables  (one .pkl per domain, for the pretrained HH):
     qtables/qtable_SAT.pkl
     qtables/qtable_VRP.pkl
@@ -14,7 +16,7 @@ Results JSON (multi-run format produced by run_hyflex_all_domains()):
     results/python_hh_pretrained_all_domains_results.json ← pretrained HH
 
 Plots (in order)
-────────────────
+----------------
   §1  Q-Table heatmaps          — one figure per domain (pretrained only)
   §2  Fitness traces            — normal vs pretrained overlaid, one figure per domain
   §3  Heuristic call counts     — boxplots, normal vs pretrained, one figure per domain
@@ -29,7 +31,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
 
-# ── paths ────────────────────────────────────────────────────────────────────
+# ----- paths -----
 NORMAL_FILE     = "results/python_hh_all_domains_results.json"
 PRETRAINED_FILE = "results/pretrained_hh_all_domains_results.json"
 
@@ -52,8 +54,18 @@ DOMAIN_ALIASES = {
     "BinPacking": "Bin",
 }
 
+plt.rcParams.update({
+    "font.size":        13,   # default text / tick labels
+    "axes.titlesize":   15,   # subplot titles
+    "axes.labelsize":   13,   # x/y axis labels
+    "xtick.labelsize":  12,   # x tick numbers
+    "ytick.labelsize":  12,   # y tick numbers
+    "legend.fontsize":  12,   # legend entries
+    "figure.titlesize": 16,   # fig.suptitle
+})
 
-# ── Save helper ───────────────────────────────────────────────────────────────
+
+# ----- Save helper -----
 
 def _savefig(name: str) -> None:
     """Save the current figure to SAVE_DIR."""
@@ -209,12 +221,12 @@ def plot_fitness_traces_comparison(normal_data: dict, pretrained_data: dict,
                     label="Pretrained (single run)")
 
         ax.set_title(f"{domain} — Fitness trace: Normal vs Pretrained",
-                     fontsize=13, fontweight="bold")
+                     fontweight="bold")
         ax.set_xlabel("Trace step")
         ax.set_ylabel("Objective (lower is better)")
         ax.set_yscale("log")
         ax.grid(True, which="both", alpha=0.3)
-        ax.legend(fontsize=10)
+        ax.legend()
         plt.tight_layout()
         _savefig(filename_template.format(domain=display_domain, i=1))
         plt.show()
@@ -302,16 +314,16 @@ def plot_heuristic_boxplots_comparison(normal_data: dict, pretrained_data: dict,
             Patch(facecolor=COLOUR_NORMAL,     alpha=0.8, label="Normal HH"),
             Patch(facecolor=COLOUR_PRETRAINED, alpha=0.8, label="Pretrained HH"),
         ]
-        ax.legend(handles=legend_elements, fontsize=10)
+        ax.legend(handles=legend_elements)
 
         ax.set_xticks(range(n_heuristics))
-        ax.set_xticklabels([f"H{h}" for h in range(n_heuristics)], fontsize=8)
-        ax.set_xlabel("Heuristic ID", fontsize=10)
-        ax.set_ylabel(ylabel, fontsize=10)
+        ax.set_xticklabels([f"H{h}" for h in range(n_heuristics)])
+        ax.set_xlabel("Heuristic ID")
+        ax.set_ylabel(ylabel)
         ax.set_yscale("log")
         ax.grid(True, axis="y", alpha=0.35)
         ax.set_title(f"{domain} — {title}: Normal vs Pretrained",
-                     fontsize=13, fontweight="bold")
+                     fontweight="bold")
         plt.tight_layout()
         _savefig(filename_template.format(domain=display_domain, key=key, i=1))
         plt.show()

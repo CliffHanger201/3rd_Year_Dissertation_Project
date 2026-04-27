@@ -69,7 +69,7 @@ public class HyflexRunner {
         hh.setTimeLimit(timeLimitMs);
         hh.loadProblemDomain(problem);
 
-        // ── Fitness-trace polling thread ─────────────────────────────────
+        // --- Fitness-trace polling thread ---
         // Because AdapHH/PHunter/GenHive are third-party we cannot instrument
         // their inner loops, so we sample getBestSolutionValue() from a
         // background thread every POLL_INTERVAL_MS milliseconds.
@@ -101,7 +101,7 @@ public class HyflexRunner {
         poller.setDaemon(true); // won't block JVM shutdown if something goes wrong
         poller.start();
 
-        // ── Run ──────────────────────────────────────────────────────────
+        // --- Run ---
         long startNs = System.nanoTime();
         hh.run();
         long endNs = System.nanoTime();
@@ -114,7 +114,7 @@ public class HyflexRunner {
             Thread.currentThread().interrupt();
         }
 
-        // ── Collect results ──────────────────────────────────────────────
+        // ------- Collect results --------
         RunResult result = new RunResult();
         result.hyperHeuristicName = hhName;
         result.domainName         = domainName;
@@ -153,7 +153,7 @@ public class HyflexRunner {
         return result;
     }
 
-    // ── Factory methods ──────────────────────────────────────────────────────
+    // ----------- Factory methods -----------
 
     private ProblemDomain createDomain(String domainName, long seed) {
         switch (domainName.toLowerCase()) {
