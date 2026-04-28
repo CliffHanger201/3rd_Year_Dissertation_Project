@@ -344,8 +344,8 @@ def run_pretrained_all_domains(
     print("=" * 60)
 
     for run_id in range(n_runs):
-        seed = base_seed + run_id      # Revert back into base_seed later
-        print(f"\n── Run {run_id + 1}/{n_runs}  (seed={seed}) ──")      # Revert back into base_seed later
+        seed = base_seed + run_id
+        print(f"\n── Run {run_id + 1}/{n_runs}  (seed={seed}) ──")
 
         for name, cls in domain_specs:
             res = run_one_eval(
@@ -370,7 +370,7 @@ def run_pretrained_all_domains(
     }
     payload["_meta"] = {
         "n_runs":             n_runs,
-        "base_seed":          base_seed,         # Revert back into base_seed later
+        "base_seed":          base_seed,
         "time_limit_ms":      time_limit_ms,
         "pretrain_time_ms":   pretrain_time_ms,
         "n_pretrain_runs":    n_pretrain_runs,

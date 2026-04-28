@@ -31,14 +31,14 @@ DOMAINS     = ["SAT", "VRP", "TSP", "BinPacking"]
 
 JAVA_HHS    = ["AdapHH", "PHunter", "GenHive"]
 PYTHON_HH   = "MyHyperHeuristic"
-# PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"
+PRETRAINED_HH = "MyHyperHeuristic (Pretrained)"
 
 HH_COLOURS  = {
     "AdapHH":           "#e6194b",
     "PHunter":          "#3cb44b",
     "GenHive":          "#4363d8",
     PYTHON_HH:          "#f58231",
-    # PRETRAINED_HH:      "#911eb4",
+    PRETRAINED_HH:      "#911eb4",
 }
 
 SAVE_DIR = "results/plots"
@@ -149,12 +149,12 @@ def plot_fitness_traces(java_data, py_data, pretrained_data,
                     color=HH_COLOURS[PYTHON_HH], linewidth=2, linestyle="--")
             any_trace = True
 
-        # pre_runs  = get_python_runs(pretrained_data, domain)
-        # pre_trace = median_trace(pre_runs)
-        # if pre_trace is not None:
-        #     ax.plot(pre_trace, label=f"{PRETRAINED_HH} (median)",
-        #             color=HH_COLOURS[PRETRAINED_HH], linewidth=2, linestyle="--")
-        #     any_trace = True
+        pre_runs  = get_python_runs(pretrained_data, domain)
+        pre_trace = median_trace(pre_runs)
+        if pre_trace is not None:
+            ax.plot(pre_trace, label=f"{PRETRAINED_HH} (median)",
+                    color=HH_COLOURS[PRETRAINED_HH], linewidth=2, linestyle="--")
+            any_trace = True
 
         if not any_trace:
             print(f"[fitness trace] No data for domain: {domain}")
@@ -181,7 +181,7 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
     One figure per domain.
     For each heuristic ID, draw one box per HH side-by-side.
     """
-    all_hh_labels = JAVA_HHS + [PYTHON_HH] #, PRETRAINED_HH]
+    all_hh_labels = JAVA_HHS + [PYTHON_HH, PRETRAINED_HH]
     n_hhs = len(all_hh_labels)
 
     for i, domain in enumerate(DOMAINS, start=1):
@@ -200,10 +200,10 @@ def plot_boxplots(java_data, py_data, pretrained_data, key, title, ylabel,
         hh_boxes[PYTHON_HH] = bd
         max_h = max(max_h, nh)
 
-        # pre_runs = get_python_runs(pretrained_data, domain)
-        # bd, nh   = collect_per_heuristic(pre_runs, key)
-        # hh_boxes[PRETRAINED_HH] = bd
-        # max_h = max(max_h, nh)
+        pre_runs = get_python_runs(pretrained_data, domain)
+        bd, nh   = collect_per_heuristic(pre_runs, key)
+        hh_boxes[PRETRAINED_HH] = bd
+        max_h = max(max_h, nh)
 
         if max_h == 0:
             print(f"[{key}] No data for domain: {domain}")

@@ -14,8 +14,8 @@ target/
 # --- Maven / Gradle ---
 .mvn/
 .settings/
-.gradle/
-build/
+# .gradle/
+# build/
 
 # --- IDEs ---
 .idea/

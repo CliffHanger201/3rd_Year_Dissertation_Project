@@ -76,6 +76,14 @@ class Phase(Enum):
     DIVERSIFY = auto()
 
 
+class AcceptanceKind(Enum):
+    """Move acceptance strategy."""
+    IMPROVE_OR_EQUAL    = auto()
+    SIMULATED_ANNEALING = auto()
+    LATE_ACCEPTANCE     = auto()
+    GREAT_DELUGE        = auto()
+
+
 # ===========================================================================
 # Configuration
 # ===========================================================================
@@ -110,8 +118,8 @@ class HHConfig:
     tighten_threshold: float = 0.85
     tighten_rate:      float = 0.002   # passed to acceptance.tighten() per iter
 
-    # # ---- Acceptance configuration ----
-    # acceptance_kind: AcceptanceKind = AcceptanceKind.LATE_ACCEPTANCE
+    # ---- Acceptance configuration ----
+    acceptance_kind: AcceptanceKind = AcceptanceKind.LATE_ACCEPTANCE
 
     # # SA parameters (if used)
     # sa_t0:                float = 1.0
@@ -314,26 +322,26 @@ class LateAcceptanceHillClimbing(MoveAcceptance):
 #             self.level *= (1.0 - factor * 0.1)
 
 
-# def make_acceptance(cfg: HHConfig) -> MoveAcceptance:
-#     ae = cfg.consider_equal_as_accept
-#     if cfg.acceptance_kind == AcceptanceKind.IMPROVE_OR_EQUAL:
-#         return ImproveOrEqualAcceptance(allow_equal=ae)
-#     if cfg.acceptance_kind == AcceptanceKind.SIMULATED_ANNEALING:
-#         return SimulatedAnnealingAcceptance(
-#             t0=cfg.sa_t0,
-#             cooling=cfg.sa_alpha,
-#             reheat_multiplier=cfg.sa_reheat_multiplier,
-#             allow_equal=ae,
-#         )
-#     if cfg.acceptance_kind == AcceptanceKind.LATE_ACCEPTANCE:
-#         return LateAcceptanceHillClimbing(L=cfg.lahc_length, allow_equal=ae)
-#     if cfg.acceptance_kind == AcceptanceKind.GREAT_DELUGE:
-#         return GreatDelugeAcceptance(
-#             initial_slack=cfg.gd_initial_slack,
-#             decay=cfg.gd_decay,
-#             allow_equal=ae,
-#         )
-#     raise ValueError(f"Unknown acceptance kind: {cfg.acceptance_kind}")
+def make_acceptance(cfg: HHConfig) -> MoveAcceptance:
+    ae = cfg.consider_equal_as_accept
+    # if cfg.acceptance_kind == AcceptanceKind.IMPROVE_OR_EQUAL:
+    #     return ImproveOrEqualAcceptance(allow_equal=ae)
+    # if cfg.acceptance_kind == AcceptanceKind.SIMULATED_ANNEALING:
+    #     return SimulatedAnnealingAcceptance(
+    #         t0=cfg.sa_t0,
+    #         cooling=cfg.sa_alpha,
+    #         reheat_multiplier=cfg.sa_reheat_multiplier,
+    #         allow_equal=ae,
+    #     )
+    if cfg.acceptance_kind == AcceptanceKind.LATE_ACCEPTANCE:
+        return LateAcceptanceHillClimbing(L=cfg.lahc_length, allow_equal=ae)
+    # if cfg.acceptance_kind == AcceptanceKind.GREAT_DELUGE:
+    #     return GreatDelugeAcceptance(
+    #         initial_slack=cfg.gd_initial_slack,
+    #         decay=cfg.gd_decay,
+    #         allow_equal=ae,
+    #     )
+    raise ValueError(f"Unknown acceptance kind: {cfg.acceptance_kind}")
 
 
 # ===========================================================================
