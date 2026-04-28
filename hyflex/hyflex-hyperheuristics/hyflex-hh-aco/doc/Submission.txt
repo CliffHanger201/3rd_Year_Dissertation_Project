@@ -1,9 +1,0 @@
-Name: 
-	José Luis Núñez Díaz
-
-email: 
-	josenunezdiaz@gmail.com
-
-Affiliation details:
-	Profile: computer engineering student
-	Home study: Universidad de Santiago de Chile.

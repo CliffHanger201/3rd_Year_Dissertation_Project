@@ -1,1 +1,0 @@
-The HyFlex sources from Gabriela Ochoa. They slightly differ from the ones decompiled from CHeSC jars. That's the reason why the current HyFlex build still depends on the HyFlex jars (from the local `maven-repo`). The sources are here for study purposes.

@@ -1,4 +1,0 @@
-Creator 			| 	Institution
-Alberto Karim Acuña Touma 	| 	Universidad de Santiago de Chile
-Gustavo Gatica			|	Universidad de Santiago de Chile
-Victor Parada			|	Universidad de Santiago de Chile
