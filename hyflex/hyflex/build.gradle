@@ -1,0 +1,10 @@
+repositories {
+    mavenCentral() // Replaced jcenter()
+
+    maven {
+        url "file://$projectDir/../maven-repo"
+    }
+}
+
+dependencies {
+}

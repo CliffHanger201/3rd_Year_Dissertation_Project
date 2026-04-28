@@ -1,0 +1,41 @@
+plugins {
+    // Apply the application plugin to add support for building a CLI application in Java.
+    id 'application'
+}
+
+repositories {
+    jcenter()
+
+    maven {
+        url "file://$projectDir/../maven-repo"
+    }
+}
+
+dependencies {
+    // This dependency is used by the application.
+    implementation group: 'com.beust', name: 'jcommander', version: '1.78'
+    // Color map
+    implementation 'net.mahdilamb:colormap:0.9.61'
+    // jinjava library
+    implementation group: 'com.hubspot.jinjava', name: 'jinjava', version: '2.6.0'
+    implementation project(':hyflex')
+    implementation project(':hyflex-ext')
+    implementation group: 'hyflex', name: 'chesc-ps', version: '2019.03.17'
+
+    implementation 'org.seage:seage-misc:1.0.0-SNAPSHOT'
+    // Json library
+    implementation group: 'org.json', name: 'json', version: '20220320'
+
+    // Add dependencies to HHs
+    new File("$projectDir/../hyflex-hyperheuristics/").listFiles().each {
+        if (it.directory && new File(it, 'build.gradle').exists()) {
+            implementation project(":${it.name}")
+        }
+    }
+}
+
+application {
+    // Define the main class for the application.
+    mainClass = 'hyflex.chesc2011.launcher.Launcher'
+}
+
